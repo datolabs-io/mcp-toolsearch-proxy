@@ -143,4 +143,6 @@ changelog:
 release:
   mode: keep-existing
   use_existing_draft: true
-  draft: false
+  # The release workflow publishes it once the provenance is attached: a
+  # published release is immutable.
+  draft: true
