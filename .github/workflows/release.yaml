@@ -5,9 +5,9 @@ on:
     branches: [main]
 
 # release-please creates a draft release with its tag; the binaries job
-# attaches the assets, publishes it, and then adds the files' provenance.
-# Release immutability is off: turning it on means attaching the provenance
-# before GoReleaser publishes.
+# attaches the assets and the files' provenance, and only then publishes it.
+# Published releases are immutable, so nothing can be added after that, and a
+# run that fails before the end leaves a draft, not a half-published release.
 # release-please and the Homebrew cask act through short-lived tokens of the
 # datolabs-automation GitHub App: the organization does not allow GITHUB_TOKEN
 # to open pull requests, PRs or tags it creates would not trigger CI, and
@@ -120,3 +120,9 @@ jobs:
           subject-name: ghcr.io/${{ github.repository }}
           subject-digest: ${{ steps.image.outputs.digest }}
           push-to-registry: true
+      # Last, so that a failure in any step before leaves a draft.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release-please.outputs.tag }}
+        run: gh release edit "$TAG" --draft=false --repo "$GITHUB_REPOSITORY"
