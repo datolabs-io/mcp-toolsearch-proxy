@@ -44,7 +44,7 @@ nfpms:
     vendor: MB Datolabs
     homepage: https://github.com/datolabs-io/mcp-toolsearch-proxy
     maintainer: MB Datolabs
-    description: MCP proxy that searches a large tool catalog with four tools.
+    description: MCP proxy that searches a large tool catalog instead of loading it.
     license: MIT
     section: net
     umask: 0o022
@@ -89,7 +89,7 @@ dockers_v2:
     extra_files: [build/licenses, packaging/model]
     labels:
       org.opencontainers.image.title: mcp-toolsearch-proxy
-      org.opencontainers.image.description: MCP proxy that searches a large tool catalog with four tools
+      org.opencontainers.image.description: MCP proxy that searches a large tool catalog instead of loading it
       org.opencontainers.image.source: https://github.com/datolabs-io/mcp-toolsearch-proxy
       org.opencontainers.image.licenses: MIT
       org.opencontainers.image.version: "{{ .Version }}"
@@ -100,7 +100,7 @@ homebrew_casks:
   - name: mcp-toolsearch-proxy
     binaries: [mcp-toolsearch-proxy]
     homepage: https://github.com/datolabs-io/mcp-toolsearch-proxy
-    description: MCP proxy that searches a large tool catalog with four tools
+    description: MCP proxy that searches a large tool catalog instead of loading it
     license: MIT
     caveats: |
       Download the built-in search model once (about 530 MB):
@@ -143,4 +143,6 @@ changelog:
 release:
   mode: keep-existing
   use_existing_draft: true
-  draft: false
+  # The release workflow publishes it once the provenance is attached: a
+  # published release is immutable.
+  draft: true
