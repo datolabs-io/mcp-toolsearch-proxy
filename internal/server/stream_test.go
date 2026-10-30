@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -25,21 +26,68 @@ import (
 // initialize handshake, and one with server/discover.
 func protocolVersions() []string { return []string{"2025-11-25", "2026-07-28"} }
 
+// frontWait is how long impatientFront waits for a response's headers, or
+// for its next bytes: long against a busy test runner's scheduling, which
+// delays the headers too, and well short of slowCall.
+const frontWait = time.Second
+
+// slowCall is how long the gate's tool "slow" takes in the tests behind
+// impatientFront: past frontWait, so the front gives up unless the headers
+// and the comments come in time.
+const slowCall = 3 * frontWait / 2
+
 // impatientFront is a reverse proxy in front of target that gives up on a
-// response whose headers take longer than wait, as gateways do with a
-// backend they wait on.
+// response whose headers, or whose next bytes, take longer than wait, as
+// gateways do with a backend they wait on.
 func impatientFront(t *testing.T, target string, wait time.Duration) *httptest.Server {
 	t.Helper()
 	u, err := url.Parse(target)
 	require.NoError(t, err)
 	rp := &httputil.ReverseProxy{
 		Rewrite:   func(r *httputil.ProxyRequest) { r.SetURL(u) },
-		Transport: &http.Transport{ResponseHeaderTimeout: wait},
+		Transport: impatient{next: &http.Transport{ResponseHeaderTimeout: wait}, wait: wait},
 		ErrorLog:  nil,
 	}
 	ts := httptest.NewServer(rp)
 	t.Cleanup(ts.Close)
 	return ts
+}
+
+// impatient is a transport that gives up on a response body whose next
+// bytes take longer than wait.
+type impatient struct {
+	next http.RoundTripper
+	wait time.Duration
+}
+
+func (i impatient) RoundTrip(r *http.Request) (*http.Response, error) {
+	ctx, cancel := context.WithCancel(r.Context())
+	resp, err := i.next.RoundTrip(r.WithContext(ctx))
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	resp.Body = &idleBody{ReadCloser: resp.Body, wait: i.wait, cancel: cancel}
+	return resp, nil
+}
+
+// idleBody cancels its response when a read waits longer than wait.
+type idleBody struct {
+	io.ReadCloser
+
+	wait   time.Duration
+	cancel context.CancelFunc
+}
+
+func (b *idleBody) Read(p []byte) (int, error) {
+	idle := time.AfterFunc(b.wait, b.cancel)
+	defer idle.Stop()
+	return b.ReadCloser.Read(p)
+}
+
+func (b *idleBody) Close() error {
+	b.cancel()
+	return b.ReadCloser.Close()
 }
 
 // connectVersion connects to endpoint speaking version.
@@ -55,19 +103,20 @@ func connectVersion(t *testing.T, endpoint, version string) *mcp.ClientSession {
 }
 
 // A call that takes longer than a proxy in front waits for response
-// headers still reaches the caller: the headers go out as soon as the call
-// starts, and comments keep the stream busy until its result.
+// headers, or for the next bytes, still reaches the caller: the headers go
+// out as soon as the call starts, and comments keep the stream busy until
+// its result.
 func TestLongCallsPassAProxyThatWaitsForHeaders(t *testing.T) {
 	t.Parallel()
 	for _, version := range protocolVersions() {
 		t.Run(version, func(t *testing.T) {
 			t.Parallel()
 			g := newGate()
-			g.slow = 800 * time.Millisecond
+			g.slow = slowCall
 			opts := &server.Options{KeepAlive: 100 * time.Millisecond}
 			ts := httptest.NewServer(server.ProxyHandler(opts, catalog.NewStore(catalog.Tools(g.list), nil), g))
 			t.Cleanup(ts.Close)
-			front := impatientFront(t, ts.URL, 300*time.Millisecond)
+			front := impatientFront(t, ts.URL, frontWait)
 			cs := connectVersion(t, front.URL+"/mcp", version)
 
 			slow, err := cs.CallTool(t.Context(), callParams("slow", nil))
