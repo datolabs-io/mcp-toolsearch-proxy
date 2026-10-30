@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.8.0](https://github.com/datolabs-io/mcp-toolsearch-proxy/compare/v0.7.0...v0.8.0) (2026-10-30)
+## [0.8.0](https://github.com/datolabs-io/mcp-toolsearch-proxy/releases/tag/v0.8.0) (2026-10-30)
 
 
 ### Features
