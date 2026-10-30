@@ -4,8 +4,10 @@ on:
   push:
     branches: [main]
 
-# release-please creates a draft release with its tag (published releases
-# are immutable); the binaries job attaches the assets and publishes it.
+# release-please creates a draft release with its tag; the binaries job
+# attaches the assets, publishes it, and then adds the files' provenance.
+# Release immutability is off: turning it on means attaching the provenance
+# before GoReleaser publishes.
 # release-please and the Homebrew cask act through short-lived tokens of the
 # datolabs-automation GitHub App: the organization does not allow GITHUB_TOKEN
 # to open pull requests, PRs or tags it creates would not trigger CI, and
@@ -94,11 +96,25 @@ jobs:
           fi
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
       - uses: actions/attest@v4.2.2
+        id: provenance
         with:
           subject-path: |
             dist/*.tar.gz
             dist/*.deb
             dist/*.rpm
+      # The attestation is in GitHub's store, where `gh attestation verify`
+      # finds it; a copy among the release's assets serves tools that look for
+      # provenance there, such as OpenSSF Scorecard, and offline verification
+      # with `gh attestation verify --bundle`.
+      - name: Attach the provenance to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release-please.outputs.tag }}
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          name="dist/mcp-toolsearch-proxy_${TAG#v}.intoto.jsonl"
+          cp "$BUNDLE" "$name"
+          gh release upload "$TAG" "$name" --repo "$GITHUB_REPOSITORY"
       - uses: actions/attest@v4.2.2
         with:
           subject-name: ghcr.io/${{ github.repository }}
