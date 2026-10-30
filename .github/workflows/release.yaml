@@ -1,0 +1,106 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+# release-please creates a draft release with its tag (published releases
+# are immutable); the binaries job attaches the assets and publishes it.
+# release-please and the Homebrew cask act through short-lived tokens of the
+# datolabs-automation GitHub App: the organization does not allow GITHUB_TOKEN
+# to open pull requests, PRs or tags it creates would not trigger CI, and
+# commits an App makes through the API are signed by GitHub, which the main
+# ruleset requires. Each token reaches one repository with only the
+# permissions its step needs.
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+    steps:
+      - uses: actions/create-github-app-token@v3.3.0
+        id: app
+        with:
+          client-id: ${{ secrets.DATOLABS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DATOLABS_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-issues: write
+      - uses: googleapis/release-please-action@v5.0.0
+        id: release
+        with:
+          token: ${{ steps.app.outputs.token }}
+          config-file: .github/release-please-config.json
+          manifest-file: .github/.release-please-manifest.json
+
+  binaries:
+    name: Binaries
+    needs: [release-please]
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: write # upload assets to the release release-please created
+      packages: write # push the image to GHCR
+      id-token: write # sign attestations
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ needs.release-please.outputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      # This job can publish, so it never restores the tool cache that CI
+      # writes: every tool is downloaded fresh and checked against mise.lock
+      # (the action installs in locked mode when the lock file is present).
+      # Only the tools the release needs are installed.
+      - uses: jdx/mise-action@v5.2.4
+        with:
+          cache: false
+          install_args: go goreleaser syft
+      - uses: docker/setup-buildx-action@v4.4.1
+      - uses: docker/login-action@v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # GITHUB_TOKEN reaches this repository only; the App pushes the cask to
+      # the tap.
+      - uses: actions/create-github-app-token@v3.3.0
+        id: tap
+        with:
+          client-id: ${{ secrets.DATOLABS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DATOLABS_APP_PRIVATE_KEY }}
+          owner: datolabs-io
+          repositories: homebrew-tap
+          permission-contents: write
+      - run: goreleaser release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ steps.tap.outputs.token }}
+      - name: Find the image digest
+        id: image
+        run: |
+          digest="$(jq -r '[.[] | select(.type | startswith("Docker")) | .extra.Digest // empty] | first // empty' dist/artifacts.json)"
+          if [ -z "$digest" ]; then
+            echo "::error::no image digest in dist/artifacts.json"
+            exit 1
+          fi
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+      - uses: actions/attest@v4.2.2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.deb
+            dist/*.rpm
+      - uses: actions/attest@v4.2.2
+        with:
+          subject-name: ghcr.io/${{ github.repository }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true

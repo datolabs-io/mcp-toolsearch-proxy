@@ -1,0 +1,200 @@
+version: "2"
+
+run:
+  # Lint the tests that need the model or a running stack too, so they
+  # cannot rot unseen.
+  build-tags:
+    - model
+    - e2e
+
+issues:
+  max-same-issues: 50
+
+formatters:
+  enable:
+    - goimports
+    - golines
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/datolabs-io/mcp-toolsearch-proxy
+    golines:
+      max-len: 120
+  exclusions:
+    generated: lax
+
+linters:
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - containedctx
+    - copyloopvar
+    - cyclop
+    - decorder
+    - depguard
+    - dupl
+    - durationcheck
+    - errcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - exptostd
+    - fatcontext
+    - forbidigo
+    - funcorder
+    - funlen
+    - gocheckcompilerdirectives
+    - gochecknoglobals
+    - gochecknoinits
+    - gochecksumtype
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - gomoddirectives
+    - goprintffuncname
+    - gosec
+    - govet
+    - iface
+    - ineffassign
+    - interfacebloat
+    - intrange
+    - ireturn
+    - makezero
+    - mirror
+    - mnd
+    - musttag
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnesserr
+    - nilnil
+    - noctx
+    - nolintlint
+    - nonamedreturns
+    - nosprintfhostport
+    - paralleltest
+    - perfsprint
+    - predeclared
+    - protogetter
+    - reassign
+    - recvcheck
+    - revive
+    - sloglint
+    - staticcheck
+    - tagalign
+    - testableexamples
+    - testifylint
+    - tparallel
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+    - whitespace
+    - wrapcheck
+
+  exclusions:
+    generated: lax
+    rules:
+      - path: _test\.go
+        linters: [dupl, funlen, goconst, mnd, wrapcheck]
+
+  settings:
+    cyclop:
+      max-complexity: 30
+      package-average: 10.0
+
+    depguard:
+      rules:
+        deprecated:
+          files: ["$all"]
+          deny:
+            - pkg: github.com/pkg/errors
+              desc: Use errors and fmt.Errorf with %w.
+        non-test:
+          files: ["!$test"]
+          deny:
+            - pkg: math/rand$
+              desc: Use crypto/rand, or math/rand/v2 where randomness is not security relevant.
+            - pkg: github.com/stretchr/testify
+              desc: testify is for tests only.
+        non-main:
+          files: ["!**/main.go"]
+          deny:
+            - pkg: log$
+              desc: Use an injected *slog.Logger.
+
+    errcheck:
+      check-type-assertions: true
+
+    exhaustive:
+      check: [switch, mapliteral]
+
+    funlen:
+      lines: 100
+      statements: 50
+
+    gocognit:
+      min-complexity: 30
+
+    gocritic:
+      settings:
+        captLocal:
+          paramsOnly: false
+        underef:
+          skipRecvDeref: false
+
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+      settings:
+        shadow:
+          strict: true
+
+    interfacebloat:
+      max: 10
+
+    mnd:
+      ignored-functions:
+        - os.Chmod
+        - os.Mkdir.*
+        - os.OpenFile
+        - os.WriteFile
+
+    nakedret:
+      max-func-lines: 0
+
+    nolintlint:
+      allow-no-explanation: [funlen, gocognit, golines]
+      require-explanation: true
+      require-specific: true
+
+    perfsprint:
+      strconcat: false
+
+    reassign:
+      patterns: [".*"]
+
+    sloglint:
+      no-global: all
+      context: scope
+
+    staticcheck:
+      checks:
+        - all
+        - -ST1016
+        - -QF1008
+
+    usetesting:
+      os-temp-dir: true
+
+    wrapcheck:
+      # Our own packages already prefix their errors.
+      ignore-package-globs:
+        - github.com/datolabs-io/mcp-toolsearch-proxy/*

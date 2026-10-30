@@ -1,0 +1,54 @@
+[Unit]
+Description=MCP tool search proxy
+Documentation=https://github.com/datolabs-io/mcp-toolsearch-proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=mcp-toolsearch-proxy
+Group=mcp-toolsearch-proxy
+# The Go runtime does not see MemoryMax= below: this soft limit, a little
+# under it, makes it collect garbage harder before the kernel kills the
+# service. The environment file, read after it, may set its own.
+Environment=GOMEMLIMIT=450MiB
+EnvironmentFile=/etc/mcp-toolsearch-proxy/env
+StateDirectory=mcp-toolsearch-proxy
+StateDirectoryMode=0700
+ExecStart=/usr/bin/mcp-toolsearch-proxy serve
+Restart=always
+RestartSec=5
+# Exit status 2 is a usage error, such as a bad setting:
+# restarting cannot fix it.
+RestartPreventExitStatus=2
+# Calls in flight get MCP_SHUTDOWN_GRACE to finish when the service stops,
+# by default TOOLSEARCH_CALL_TIMEOUT (2m) plus 15s. Keep this above it:
+# a write cut off may still complete upstream.
+TimeoutStopSec=150s
+MemoryMax=512M
+UMask=0077
+CapabilityBoundingSet=
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+ProcSubset=pid
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target

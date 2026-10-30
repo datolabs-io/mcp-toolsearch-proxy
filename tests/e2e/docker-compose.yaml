@@ -1,0 +1,96 @@
+# The end-to-end stack: agentgateway in front of the proxy and of fixture
+# MCP servers, in the topology of agentgateway.yaml. Start it with
+# `mise run e2e:up`, test with `mise run test:e2e`, stop with `mise run e2e:down`.
+#
+# The built-in model is downloaded once into ../../.cache/model (or
+# E2E_MODEL_DIR); set TOOLSEARCH_EMBEDDER=none to test lexical search only.
+name: mcp-toolsearch-proxy-e2e
+
+services:
+  gateway:
+    image: ghcr.io/agentgateway/agentgateway:v1.7.0@sha256:60216aafb03d37f94e952ff3d51d2f630a65b10ecaebdc0a864882f92610c45b
+    working_dir: /e2e
+    command: ["-f", "/e2e/agentgateway.yaml"]
+    volumes:
+      - ./agentgateway.yaml:/e2e/agentgateway.yaml:ro
+      - ./testdata/jwks.json:/e2e/testdata/jwks.json:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      proxy:
+        condition: service_started
+      proxy-closed:
+        condition: service_started
+
+  model:
+    build: {context: ../.., dockerfile: tests/e2e/Dockerfile, target: proxy}
+    command: ["fetch-model", "-model-dir", "/model"]
+    volumes:
+      - ${E2E_MODEL_DIR:-../../.cache/model}:/model
+
+  proxy:
+    build: {context: ../.., dockerfile: tests/e2e/Dockerfile, target: proxy}
+    environment:
+      MCP_ADDR: 0.0.0.0:8000
+      # The gateway is reached through front, which serves only its public
+      # name: every test fails unless the proxy sends that Host.
+      TOOLSEARCH_UPSTREAM: http://front:8000/mcp/all
+      TOOLSEARCH_UPSTREAM_HOST: gateway.e2e.test
+      TOOLSEARCH_EMBEDDER: ${TOOLSEARCH_EMBEDDER:-builtin}
+      TOOLSEARCH_MODEL_DIR: /model
+    volumes:
+      - ${E2E_MODEL_DIR:-../../.cache/model}:/model:ro
+    depends_on:
+      model:
+        condition: service_completed_successfully
+      front:
+        condition: service_started
+      weather:
+        condition: service_started
+      admin:
+        condition: service_started
+
+  # A second proxy, in front of the gateway's /mcp/closed route, where one
+  # server stops listing its tools after the first listing. Its catalogs
+  # are stale at once, so every search lists again in the background.
+  proxy-closed:
+    build: {context: ../.., dockerfile: tests/e2e/Dockerfile, target: proxy}
+    environment:
+      MCP_ADDR: 0.0.0.0:8000
+      TOOLSEARCH_UPSTREAM: http://front:8000/mcp/closed
+      TOOLSEARCH_UPSTREAM_HOST: gateway.e2e.test
+      TOOLSEARCH_EMBEDDER: none
+      TOOLSEARCH_CATALOG_TTL: 1ms
+      TOOLSEARCH_CATALOG_MAX_AGE: 1h
+      # The tests read its failed builds here.
+      MCP_METRICS_ADDR: 0.0.0.0:9090
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      front:
+        condition: service_started
+      weather:
+        condition: service_started
+      billing:
+        condition: service_started
+
+  # The gateway at an internal address that serves only its public name.
+  front:
+    build: {context: ../.., dockerfile: tests/e2e/Dockerfile, target: fixture}
+    command: ["-forward", "http://gateway:3000", "-require-host", "gateway.e2e.test"]
+
+  weather:
+    build: {context: ../.., dockerfile: tests/e2e/Dockerfile, target: fixture}
+    command: ["-set", "weather"]
+
+  admin:
+    build: {context: ../.., dockerfile: tests/e2e/Dockerfile, target: fixture}
+    # Like most servers built before MCP 2026-07-28: keeps sessions and fails
+    # server/discover, so clients behind the gateway must fall back to initialize.
+    command: ["-set", "admin", "-legacy", "-discover-500"]
+
+  billing:
+    build: {context: ../.., dockerfile: tests/e2e/Dockerfile, target: fixture}
+    # Lists its tools once, then refuses every listing, as a server whose
+    # own backend went down does.
+    command: ["-set", "billing", "-list-ok", "1"]

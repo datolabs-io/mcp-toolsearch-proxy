@@ -1,0 +1,22 @@
+version: "0.2"
+language: en,en-GB
+ignorePaths:
+  - ".vscode/*.json"
+  - "go.mod"
+  - "go.sum"
+  - ".golangci.yaml"
+  - "**/testdata/**"
+  - "vendor/**"
+  - "coverage.out"
+  - ".git/**"
+dictionaryDefinitions:
+  - name: custom-dictionary
+    path: .cspell/dictionary.txt
+    addWords: true
+dictionaries:
+  - software-terms
+  - golang
+  - custom-dictionary
+ignoreRegExpList:
+  # Hex test vectors.
+  - "/\\b[0-9a-fA-F]{8,}\\b/g"

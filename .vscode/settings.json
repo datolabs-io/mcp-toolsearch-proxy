@@ -1,0 +1,14 @@
+{
+  "files.readonlyInclude": {
+    "go.sum": true,
+    "vendor/**": true
+  },
+  "editor.rulers": [120],
+  "markdownlint.configFile": ".markdownlint.yaml",
+  "mise.configureExtensionsUseSymLinks": true,
+  "go.lintTool": "golangci-lint-v2",
+  "go.lintFlags": ["--path-mode=abs", "--fast-only"],
+  "go.formatFlags": ["fmt", "--stdin"],
+  "go.toolsManagement.autoUpdate": true,
+  "yaml.schemaStore.enable": true
+}

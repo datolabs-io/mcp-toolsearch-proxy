@@ -1,0 +1,1322 @@
+[
+ {
+  "domain": "inventory",
+  "system": "the inventory system",
+  "nouns": [
+   {
+    "name": "products",
+    "one": "product"
+   },
+   {
+    "name": "stock_levels",
+    "one": "stock level"
+   },
+   {
+    "name": "suppliers",
+    "one": "supplier"
+   },
+   {
+    "name": "purchase_orders",
+    "one": "purchase order"
+   }
+  ]
+ },
+ {
+  "domain": "fleet",
+  "system": "the fleet manager",
+  "nouns": [
+   {
+    "name": "vehicles",
+    "one": "vehicle"
+   },
+   {
+    "name": "drivers",
+    "one": "driver"
+   },
+   {
+    "name": "fuel_logs",
+    "one": "fuel log"
+   },
+   {
+    "name": "service_records",
+    "one": "service record"
+   }
+  ]
+ },
+ {
+  "domain": "warehouse",
+  "system": "the warehouse system",
+  "nouns": [
+   {
+    "name": "shelves",
+    "one": "shelf"
+   },
+   {
+    "name": "pallets",
+    "one": "pallet"
+   },
+   {
+    "name": "shipments",
+    "one": "shipment"
+   },
+   {
+    "name": "pick_lists",
+    "one": "pick list"
+   }
+  ]
+ },
+ {
+  "domain": "recipes",
+  "system": "the recipe box",
+  "nouns": [
+   {
+    "name": "recipes",
+    "one": "recipe"
+   },
+   {
+    "name": "ingredients",
+    "one": "ingredient"
+   },
+   {
+    "name": "meal_plans",
+    "one": "meal plan"
+   },
+   {
+    "name": "cookbooks",
+    "one": "cookbook"
+   }
+  ]
+ },
+ {
+  "domain": "garden",
+  "system": "the garden planner",
+  "nouns": [
+   {
+    "name": "plants",
+    "one": "plant"
+   },
+   {
+    "name": "beds",
+    "one": "bed"
+   },
+   {
+    "name": "watering_schedules",
+    "one": "watering schedule"
+   },
+   {
+    "name": "harvests",
+    "one": "harvest"
+   }
+  ]
+ },
+ {
+  "domain": "library",
+  "system": "the library catalogue",
+  "nouns": [
+   {
+    "name": "books",
+    "one": "book"
+   },
+   {
+    "name": "loans",
+    "one": "loan"
+   },
+   {
+    "name": "holds",
+    "one": "hold"
+   },
+   {
+    "name": "branches",
+    "one": "branch"
+   }
+  ]
+ },
+ {
+  "domain": "school",
+  "system": "the school register",
+  "nouns": [
+   {
+    "name": "students",
+    "one": "student"
+   },
+   {
+    "name": "courses",
+    "one": "course"
+   },
+   {
+    "name": "grades",
+    "one": "grade"
+   },
+   {
+    "name": "classrooms",
+    "one": "classroom"
+   }
+  ]
+ },
+ {
+  "domain": "clinic",
+  "system": "the clinic records",
+  "nouns": [
+   {
+    "name": "patients",
+    "one": "patient"
+   },
+   {
+    "name": "prescriptions",
+    "one": "prescription"
+   },
+   {
+    "name": "lab_results",
+    "one": "lab result"
+   },
+   {
+    "name": "referrals",
+    "one": "referral"
+   }
+  ]
+ },
+ {
+  "domain": "pharmacy",
+  "system": "the pharmacy system",
+  "nouns": [
+   {
+    "name": "medicines",
+    "one": "medicine"
+   },
+   {
+    "name": "refills",
+    "one": "refill"
+   },
+   {
+    "name": "batches",
+    "one": "batch"
+   },
+   {
+    "name": "interactions",
+    "one": "interaction"
+   }
+  ]
+ },
+ {
+  "domain": "insurance",
+  "system": "the insurance portal",
+  "nouns": [
+   {
+    "name": "policies",
+    "one": "policy"
+   },
+   {
+    "name": "claims",
+    "one": "claim"
+   },
+   {
+    "name": "quotes",
+    "one": "quote"
+   },
+   {
+    "name": "beneficiaries",
+    "one": "beneficiary"
+   }
+  ]
+ },
+ {
+  "domain": "property",
+  "system": "the property manager",
+  "nouns": [
+   {
+    "name": "listings",
+    "one": "listing"
+   },
+   {
+    "name": "viewings",
+    "one": "viewing"
+   },
+   {
+    "name": "leases",
+    "one": "lease"
+   },
+   {
+    "name": "tenants",
+    "one": "tenant"
+   }
+  ]
+ },
+ {
+  "domain": "parking",
+  "system": "the parking system",
+  "nouns": [
+   {
+    "name": "spaces",
+    "one": "space"
+   },
+   {
+    "name": "permits",
+    "one": "permit"
+   },
+   {
+    "name": "fines",
+    "one": "fine"
+   },
+   {
+    "name": "zones",
+    "one": "zone"
+   }
+  ]
+ },
+ {
+  "domain": "energy",
+  "system": "the energy portal",
+  "nouns": [
+   {
+    "name": "meters",
+    "one": "meter"
+   },
+   {
+    "name": "readings",
+    "one": "reading"
+   },
+   {
+    "name": "tariffs",
+    "one": "tariff"
+   },
+   {
+    "name": "outages",
+    "one": "outage"
+   }
+  ]
+ },
+ {
+  "domain": "iot",
+  "system": "the device hub",
+  "nouns": [
+   {
+    "name": "sensors",
+    "one": "sensor"
+   },
+   {
+    "name": "gateways",
+    "one": "gateway"
+   },
+   {
+    "name": "firmware_images",
+    "one": "firmware image"
+   },
+   {
+    "name": "rules",
+    "one": "rule"
+   }
+  ]
+ },
+ {
+  "domain": "backups",
+  "system": "the backup service",
+  "nouns": [
+   {
+    "name": "backup_jobs",
+    "one": "backup job"
+   },
+   {
+    "name": "restore_points",
+    "one": "restore point"
+   },
+   {
+    "name": "retention_policies",
+    "one": "retention policy"
+   },
+   {
+    "name": "vaults",
+    "one": "vault"
+   }
+  ]
+ },
+ {
+  "domain": "certificates",
+  "system": "the certificate manager",
+  "nouns": [
+   {
+    "name": "certificates",
+    "one": "certificate"
+   },
+   {
+    "name": "issuers",
+    "one": "issuer"
+   },
+   {
+    "name": "renewals",
+    "one": "renewal"
+   },
+   {
+    "name": "revocations",
+    "one": "revocation"
+   }
+  ]
+ },
+ {
+  "domain": "firewall",
+  "system": "the firewall",
+  "nouns": [
+   {
+    "name": "filter_rules",
+    "one": "filter rule"
+   },
+   {
+    "name": "address_lists",
+    "one": "address list"
+   },
+   {
+    "name": "nat_rules",
+    "one": "NAT rule"
+   },
+   {
+    "name": "zones",
+    "one": "zone"
+   }
+  ]
+ },
+ {
+  "domain": "broker",
+  "system": "the message broker",
+  "nouns": [
+   {
+    "name": "topics",
+    "one": "topic"
+   },
+   {
+    "name": "consumer_groups",
+    "one": "consumer group"
+   },
+   {
+    "name": "partitions",
+    "one": "partition"
+   },
+   {
+    "name": "subscriptions",
+    "one": "subscription"
+   }
+  ]
+ },
+ {
+  "domain": "database",
+  "system": "the database server",
+  "nouns": [
+   {
+    "name": "tables",
+    "one": "table"
+   },
+   {
+    "name": "indexes",
+    "one": "index"
+   },
+   {
+    "name": "migrations",
+    "one": "migration"
+   },
+   {
+    "name": "replicas",
+    "one": "replica"
+   }
+  ]
+ },
+ {
+  "domain": "cache",
+  "system": "the cache cluster",
+  "nouns": [
+   {
+    "name": "cache_keys",
+    "one": "cache key"
+   },
+   {
+    "name": "namespaces",
+    "one": "namespace"
+   },
+   {
+    "name": "eviction_policies",
+    "one": "eviction policy"
+   },
+   {
+    "name": "nodes",
+    "one": "node"
+   }
+  ]
+ },
+ {
+  "domain": "cms",
+  "system": "the website CMS",
+  "nouns": [
+   {
+    "name": "pages",
+    "one": "page"
+   },
+   {
+    "name": "media_assets",
+    "one": "media asset"
+   },
+   {
+    "name": "menus",
+    "one": "menu"
+   },
+   {
+    "name": "redirects",
+    "one": "redirect"
+   }
+  ]
+ },
+ {
+  "domain": "shop",
+  "system": "the online shop",
+  "nouns": [
+   {
+    "name": "carts",
+    "one": "cart"
+   },
+   {
+    "name": "coupons",
+    "one": "coupon"
+   },
+   {
+    "name": "product_reviews",
+    "one": "product review"
+   },
+   {
+    "name": "gift_cards",
+    "one": "gift card"
+   }
+  ]
+ },
+ {
+  "domain": "lms",
+  "system": "the learning platform",
+  "nouns": [
+   {
+    "name": "lessons",
+    "one": "lesson"
+   },
+   {
+    "name": "quizzes",
+    "one": "quiz"
+   },
+   {
+    "name": "enrollments",
+    "one": "enrollment"
+   },
+   {
+    "name": "badges",
+    "one": "badge"
+   }
+  ]
+ },
+ {
+  "domain": "recruiting",
+  "system": "the hiring system",
+  "nouns": [
+   {
+    "name": "candidates",
+    "one": "candidate"
+   },
+   {
+    "name": "job_openings",
+    "one": "job opening"
+   },
+   {
+    "name": "offers",
+    "one": "offer"
+   },
+   {
+    "name": "referrals",
+    "one": "referral"
+   }
+  ]
+ },
+ {
+  "domain": "legal",
+  "system": "the case manager",
+  "nouns": [
+   {
+    "name": "cases",
+    "one": "case"
+   },
+   {
+    "name": "filings",
+    "one": "filing"
+   },
+   {
+    "name": "clauses",
+    "one": "clause"
+   },
+   {
+    "name": "court_dates",
+    "one": "court date"
+   }
+  ]
+ },
+ {
+  "domain": "procurement",
+  "system": "the procurement system",
+  "nouns": [
+   {
+    "name": "requisitions",
+    "one": "requisition"
+   },
+   {
+    "name": "vendors",
+    "one": "vendor"
+   },
+   {
+    "name": "bids",
+    "one": "bid"
+   },
+   {
+    "name": "approvals",
+    "one": "approval"
+   }
+  ]
+ },
+ {
+  "domain": "assets",
+  "system": "the asset register",
+  "nouns": [
+   {
+    "name": "hardware_assets",
+    "one": "hardware asset"
+   },
+   {
+    "name": "licenses",
+    "one": "license"
+   },
+   {
+    "name": "warranties",
+    "one": "warranty"
+   },
+   {
+    "name": "locations",
+    "one": "location"
+   }
+  ]
+ },
+ {
+  "domain": "facilities",
+  "system": "the facilities desk",
+  "nouns": [
+   {
+    "name": "rooms",
+    "one": "room"
+   },
+   {
+    "name": "work_orders",
+    "one": "work order"
+   },
+   {
+    "name": "cleaning_rounds",
+    "one": "cleaning round"
+   },
+   {
+    "name": "access_badges",
+    "one": "access badge"
+   }
+  ]
+ },
+ {
+  "domain": "marketing",
+  "system": "the marketing suite",
+  "nouns": [
+   {
+    "name": "campaigns",
+    "one": "campaign"
+   },
+   {
+    "name": "audiences",
+    "one": "audience"
+   },
+   {
+    "name": "landing_pages",
+    "one": "landing page"
+   },
+   {
+    "name": "ab_tests",
+    "one": "A/B test"
+   }
+  ]
+ },
+ {
+  "domain": "survey",
+  "system": "the survey tool",
+  "nouns": [
+   {
+    "name": "surveys",
+    "one": "survey"
+   },
+   {
+    "name": "responses",
+    "one": "response"
+   },
+   {
+    "name": "questions",
+    "one": "question"
+   },
+   {
+    "name": "panels",
+    "one": "panel"
+   }
+  ]
+ },
+ {
+  "domain": "social",
+  "system": "the social media scheduler",
+  "nouns": [
+   {
+    "name": "social_accounts",
+    "one": "social account"
+   },
+   {
+    "name": "scheduled_posts",
+    "one": "scheduled post"
+   },
+   {
+    "name": "mentions",
+    "one": "mention"
+   },
+   {
+    "name": "hashtags",
+    "one": "hashtag"
+   }
+  ]
+ },
+ {
+  "domain": "podcasts",
+  "system": "the podcast host",
+  "nouns": [
+   {
+    "name": "episodes",
+    "one": "episode"
+   },
+   {
+    "name": "shows",
+    "one": "show"
+   },
+   {
+    "name": "transcripts",
+    "one": "transcript"
+   },
+   {
+    "name": "sponsors",
+    "one": "sponsor"
+   }
+  ]
+ },
+ {
+  "domain": "video",
+  "system": "the video platform",
+  "nouns": [
+   {
+    "name": "videos",
+    "one": "video"
+   },
+   {
+    "name": "captions",
+    "one": "caption"
+   },
+   {
+    "name": "thumbnails",
+    "one": "thumbnail"
+   },
+   {
+    "name": "live_streams",
+    "one": "live stream"
+   }
+  ]
+ },
+ {
+  "domain": "photos",
+  "system": "the photo library",
+  "nouns": [
+   {
+    "name": "photos",
+    "one": "photo"
+   },
+   {
+    "name": "faces",
+    "one": "face"
+   },
+   {
+    "name": "shared_links",
+    "one": "shared link"
+   },
+   {
+    "name": "edits",
+    "one": "edit"
+   }
+  ]
+ },
+ {
+  "domain": "pets",
+  "system": "the pet care app",
+  "nouns": [
+   {
+    "name": "pets",
+    "one": "pet"
+   },
+   {
+    "name": "vet_visits",
+    "one": "vet visit"
+   },
+   {
+    "name": "vaccinations",
+    "one": "vaccination"
+   },
+   {
+    "name": "feeding_schedules",
+    "one": "feeding schedule"
+   }
+  ]
+ },
+ {
+  "domain": "farm",
+  "system": "the farm manager",
+  "nouns": [
+   {
+    "name": "fields",
+    "one": "field"
+   },
+   {
+    "name": "crops",
+    "one": "crop"
+   },
+   {
+    "name": "livestock",
+    "one": "animal"
+   },
+   {
+    "name": "tractors",
+    "one": "tractor"
+   }
+  ]
+ },
+ {
+  "domain": "brewery",
+  "system": "the brewery log",
+  "nouns": [
+   {
+    "name": "brews",
+    "one": "brew"
+   },
+   {
+    "name": "tanks",
+    "one": "tank"
+   },
+   {
+    "name": "kegs",
+    "one": "keg"
+   },
+   {
+    "name": "hop_varieties",
+    "one": "hop variety"
+   }
+  ]
+ },
+ {
+  "domain": "restaurant",
+  "system": "the restaurant system",
+  "nouns": [
+   {
+    "name": "tables",
+    "one": "table"
+   },
+   {
+    "name": "reservations",
+    "one": "reservation"
+   },
+   {
+    "name": "menu_items",
+    "one": "menu item"
+   },
+   {
+    "name": "shifts",
+    "one": "shift"
+   }
+  ]
+ },
+ {
+  "domain": "gym",
+  "system": "the gym system",
+  "nouns": [
+   {
+    "name": "members",
+    "one": "member"
+   },
+   {
+    "name": "classes",
+    "one": "class"
+   },
+   {
+    "name": "trainers",
+    "one": "trainer"
+   },
+   {
+    "name": "lockers",
+    "one": "locker"
+   }
+  ]
+ },
+ {
+  "domain": "museum",
+  "system": "the museum collection",
+  "nouns": [
+   {
+    "name": "exhibits",
+    "one": "exhibit"
+   },
+   {
+    "name": "artworks",
+    "one": "artwork"
+   },
+   {
+    "name": "tours",
+    "one": "tour"
+   },
+   {
+    "name": "loans",
+    "one": "loan"
+   }
+  ]
+ },
+ {
+  "domain": "astronomy",
+  "system": "the observatory log",
+  "nouns": [
+   {
+    "name": "telescopes",
+    "one": "telescope"
+   },
+   {
+    "name": "observations",
+    "one": "observation"
+   },
+   {
+    "name": "star_charts",
+    "one": "star chart"
+   },
+   {
+    "name": "comets",
+    "one": "comet"
+   }
+  ]
+ },
+ {
+  "domain": "lab",
+  "system": "the lab notebook",
+  "nouns": [
+   {
+    "name": "samples",
+    "one": "sample"
+   },
+   {
+    "name": "experiments",
+    "one": "experiment"
+   },
+   {
+    "name": "instruments",
+    "one": "instrument"
+   },
+   {
+    "name": "protocols",
+    "one": "protocol"
+   }
+  ]
+ },
+ {
+  "domain": "factory",
+  "system": "the factory floor system",
+  "nouns": [
+   {
+    "name": "work_cells",
+    "one": "work cell"
+   },
+   {
+    "name": "bills_of_materials",
+    "one": "bill of materials"
+   },
+   {
+    "name": "defects",
+    "one": "defect"
+   },
+   {
+    "name": "machines",
+    "one": "machine"
+   }
+  ]
+ },
+ {
+  "domain": "shipping",
+  "system": "the shipping desk",
+  "nouns": [
+   {
+    "name": "parcels",
+    "one": "parcel"
+   },
+   {
+    "name": "carriers",
+    "one": "carrier"
+   },
+   {
+    "name": "labels",
+    "one": "label"
+   },
+   {
+    "name": "pickups",
+    "one": "pickup"
+   }
+  ]
+ },
+ {
+  "domain": "customs",
+  "system": "the customs portal",
+  "nouns": [
+   {
+    "name": "declarations",
+    "one": "declaration"
+   },
+   {
+    "name": "tariff_codes",
+    "one": "tariff code"
+   },
+   {
+    "name": "inspections",
+    "one": "inspection"
+   },
+   {
+    "name": "customs_brokers",
+    "one": "customs broker"
+   }
+  ]
+ },
+ {
+  "domain": "charity",
+  "system": "the charity CRM",
+  "nouns": [
+   {
+    "name": "donors",
+    "one": "donor"
+   },
+   {
+    "name": "donations",
+    "one": "donation"
+   },
+   {
+    "name": "grants",
+    "one": "grant"
+   },
+   {
+    "name": "volunteers",
+    "one": "volunteer"
+   }
+  ]
+ },
+ {
+  "domain": "sports",
+  "system": "the league manager",
+  "nouns": [
+   {
+    "name": "teams",
+    "one": "team"
+   },
+   {
+    "name": "matches",
+    "one": "match"
+   },
+   {
+    "name": "players",
+    "one": "player"
+   },
+   {
+    "name": "standings",
+    "one": "standing"
+   }
+  ]
+ },
+ {
+  "domain": "chess",
+  "system": "the chess club app",
+  "nouns": [
+   {
+    "name": "games",
+    "one": "game"
+   },
+   {
+    "name": "openings",
+    "one": "opening"
+   },
+   {
+    "name": "puzzles",
+    "one": "puzzle"
+   },
+   {
+    "name": "ratings",
+    "one": "rating"
+   }
+  ]
+ },
+ {
+  "domain": "gaming",
+  "system": "the game launcher",
+  "nouns": [
+   {
+    "name": "game_saves",
+    "one": "game save"
+   },
+   {
+    "name": "achievements",
+    "one": "achievement"
+   },
+   {
+    "name": "leaderboards",
+    "one": "leaderboard"
+   },
+   {
+    "name": "mods",
+    "one": "mod"
+   }
+  ]
+ },
+ {
+  "domain": "printing",
+  "system": "the 3D print farm",
+  "nouns": [
+   {
+    "name": "printers",
+    "one": "printer"
+   },
+   {
+    "name": "print_jobs",
+    "one": "print job"
+   },
+   {
+    "name": "filaments",
+    "one": "filament"
+   },
+   {
+    "name": "print_profiles",
+    "one": "print profile"
+   }
+  ]
+ },
+ {
+  "domain": "marina",
+  "system": "the marina office",
+  "nouns": [
+   {
+    "name": "berths",
+    "one": "berth"
+   },
+   {
+    "name": "boats",
+    "one": "boat"
+   },
+   {
+    "name": "moorings",
+    "one": "mooring"
+   },
+   {
+    "name": "tide_tables",
+    "one": "tide table"
+   }
+  ]
+ },
+ {
+  "domain": "railway",
+  "system": "the railway operator",
+  "nouns": [
+   {
+    "name": "trains",
+    "one": "train"
+   },
+   {
+    "name": "stations",
+    "one": "station"
+   },
+   {
+    "name": "timetables",
+    "one": "timetable"
+   },
+   {
+    "name": "delays",
+    "one": "delay"
+   }
+  ]
+ },
+ {
+  "domain": "wine",
+  "system": "the wine cellar app",
+  "nouns": [
+   {
+    "name": "wines",
+    "one": "wine"
+   },
+   {
+    "name": "cellars",
+    "one": "cellar"
+   },
+   {
+    "name": "tastings",
+    "one": "tasting"
+   },
+   {
+    "name": "vintages",
+    "one": "vintage"
+   }
+  ]
+ },
+ {
+  "domain": "art",
+  "system": "the art studio manager",
+  "nouns": [
+   {
+    "name": "commissions",
+    "one": "commission"
+   },
+   {
+    "name": "canvases",
+    "one": "canvas"
+   },
+   {
+    "name": "galleries",
+    "one": "gallery"
+   },
+   {
+    "name": "auctions",
+    "one": "auction"
+   }
+  ]
+ },
+ {
+  "domain": "archive",
+  "system": "the records archive",
+  "nouns": [
+   {
+    "name": "records",
+    "one": "record"
+   },
+   {
+    "name": "boxes",
+    "one": "box"
+   },
+   {
+    "name": "retention_schedules",
+    "one": "retention schedule"
+   },
+   {
+    "name": "finding_aids",
+    "one": "finding aid"
+   }
+  ]
+ },
+ {
+  "domain": "genealogy",
+  "system": "the family tree app",
+  "nouns": [
+   {
+    "name": "ancestors",
+    "one": "ancestor"
+   },
+   {
+    "name": "family_trees",
+    "one": "family tree"
+   },
+   {
+    "name": "sources",
+    "one": "source"
+   },
+   {
+    "name": "relationships",
+    "one": "relationship"
+   }
+  ]
+ },
+ {
+  "domain": "compliance",
+  "system": "the compliance tracker",
+  "nouns": [
+   {
+    "name": "controls",
+    "one": "control"
+   },
+   {
+    "name": "audits",
+    "one": "audit"
+   },
+   {
+    "name": "findings",
+    "one": "finding"
+   },
+   {
+    "name": "evidence_items",
+    "one": "evidence item"
+   }
+  ]
+ },
+ {
+  "domain": "kubernetes",
+  "system": "the Kubernetes cluster",
+  "nouns": [
+   {
+    "name": "pods",
+    "one": "pod"
+   },
+   {
+    "name": "namespaces",
+    "one": "namespace"
+   },
+   {
+    "name": "config_maps",
+    "one": "config map"
+   },
+   {
+    "name": "ingresses",
+    "one": "ingress"
+   }
+  ]
+ },
+ {
+  "domain": "flags",
+  "system": "the feature flag service",
+  "nouns": [
+   {
+    "name": "feature_flags",
+    "one": "feature flag"
+   },
+   {
+    "name": "segments",
+    "one": "segment"
+   },
+   {
+    "name": "rollouts",
+    "one": "rollout"
+   },
+   {
+    "name": "experiments",
+    "one": "experiment"
+   }
+  ]
+ },
+ {
+  "domain": "loyalty",
+  "system": "the loyalty programme",
+  "nouns": [
+   {
+    "name": "rewards",
+    "one": "reward"
+   },
+   {
+    "name": "tiers",
+    "one": "tier"
+   },
+   {
+    "name": "point_balances",
+    "one": "point balance"
+   },
+   {
+    "name": "redemptions",
+    "one": "redemption"
+   }
+  ]
+ }
+]

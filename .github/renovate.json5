@@ -1,0 +1,110 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  description: "Renovate configuration for mcp-toolsearch-proxy",
+  extends: ["config:best-practices", ":semanticCommits"],
+  // config:best-practices ignores test directories; the end-to-end stack in
+  // tests/e2e pins agentgateway and the build images, and those must move too.
+  ignorePaths: ["**/node_modules/**", "**/vendor/**"],
+  customManagers: [
+    {
+      description: "Node runtime of the pre-commit hooks",
+      customType: "regex",
+      managerFilePatterns: ["/^\\.pre-commit-config\\.yaml$/"],
+      matchStrings: ["default_language_version:\\s*\\n\\s*node:\\s*\"(?<currentValue>[^\"]+)\""],
+      depNameTemplate: "node",
+      datasourceTemplate: "node-version",
+    },
+  ],
+  // Actions are pinned by .github/workflows/actions.lock, not by digests in the
+  // workflows: Renovate regenerates the lockfile with `gh actions-lock` in each
+  // update, and does not suggest digest pins for workflows the lockfile covers.
+  timezone: "Europe/Vilnius",
+  schedule: ["before 6am on monday"],
+  labels: ["dependencies"],
+  dependencyDashboard: true,
+  rebaseWhen: "conflicted",
+  // Supply-chain cooling-off for every manager.
+  minimumReleaseAge: "3 days",
+  // Never propose a module that needs a newer Go than the go directive.
+  constraintsFiltering: "strict",
+  postUpdateOptions: ["gomodTidy", "gomodUpdateImportPaths"],
+  osvVulnerabilityAlerts: true,
+  vulnerabilityAlerts: {
+    labels: ["dependencies", "security"],
+    schedule: ["at any time"],
+    minimumReleaseAge: "0 days",
+  },
+  "pre-commit": { enabled: true },
+  packageRules: [
+    {
+      description: "Minimum Go version is raised by hand, never by Renovate",
+      matchManagers: ["gomod"],
+      matchDepTypes: ["golang", "toolchain"],
+      enabled: false,
+    },
+    // Go modules are vendored, so every gomod update rewrites vendor/: third-party
+    // source that is compiled into the release binaries and that CI does not review.
+    // A green CI run says the code builds and the tests pass, not that the new
+    // source is benign, so these updates wait for a person to read the vendor diff.
+    // Actions are pinned by the lockfile, and mise tools and pre-commit hooks are
+    // pinned by version (mise tools also by checksum in mise.lock); none of them
+    // ships in the binaries, so those groups below still automerge.
+    {
+      description: "Go dependencies change vendor/, so updates wait for review",
+      matchManagers: ["gomod"],
+      automerge: false,
+    },
+    // The proxy's Go modules are compiled into its binaries, so an update to one
+    // is a fix: it reaches the release notes and, alone, makes a patch release.
+    // Everything else Renovate updates (tools, actions, hooks, the bench module)
+    // ships in no binary and stays a hidden chore.
+    {
+      description: "Go modules of the proxy are fixes, so their updates are released",
+      matchManagers: ["gomod"],
+      matchFileNames: ["go.mod"],
+      semanticCommitType: "fix",
+    },
+    {
+      description: "golang.org/x modules move together",
+      matchPackageNames: ["golang.org/x/**"],
+      groupName: "golang.org/x",
+    },
+    {
+      description: "GitHub Actions in one weekly PR",
+      matchManagers: ["github-actions"],
+      matchUpdateTypes: ["minor", "patch", "digest", "pin", "pinDigest"],
+      groupName: "github actions",
+      automerge: true,
+    },
+    {
+      description: "Development tools pinned in mise (Go toolchain, linters, scanners)",
+      matchManagers: ["mise"],
+      matchUpdateTypes: ["minor", "patch"],
+      groupName: "mise tools",
+      automerge: true,
+    },
+    {
+      description: "The Go toolchain in mise and the golang build image of the e2e stack move together; after the mise rule, so this group name wins",
+      matchPackageNames: ["go", "golang"],
+      groupName: "go toolchain",
+    },
+    {
+      description: "pre-commit hooks",
+      matchManagers: ["pre-commit"],
+      matchUpdateTypes: ["minor", "patch"],
+      groupName: "pre-commit hooks",
+      automerge: true,
+    },
+    {
+      description: "Actively maintained, just rarely tagged; not abandoned",
+      matchPackageNames: ["pre-commit/pre-commit-hooks"],
+      abandonmentThreshold: "3 years",
+    },
+    {
+      description: "Majors only when approved from the dependency dashboard",
+      matchUpdateTypes: ["major"],
+      dependencyDashboardApproval: true,
+      addLabels: ["breaking"],
+    },
+  ],
+}

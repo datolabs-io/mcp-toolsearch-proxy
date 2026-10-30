@@ -1,0 +1,6 @@
+* text=auto eol=lf
+# Fixtures and golden files must stay byte-exact.
+**/testdata/** -text
+go.sum linguist-generated
+vendor/** linguist-vendored
+.cspell/dictionary.txt linguist-generated

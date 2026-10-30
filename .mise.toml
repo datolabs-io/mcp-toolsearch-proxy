@@ -1,0 +1,130 @@
+[settings]
+idiomatic_version_file_enable_tools = []
+
+[tools]
+go = "1.27.3"
+golangci-lint = "2.15.0"
+gitleaks = "8.30.1"
+pre-commit = "4.7.0"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.9.0"
+goreleaser = "2.19.0"
+syft = "1.55.0"
+
+[hooks]
+postinstall = "pre-commit install -f"
+
+[tasks.vendor]
+description = "Tidy go.mod and refresh vendor/"
+run = ["go mod tidy", "go mod vendor"]
+
+[tasks.build]
+description = "Build the server into bin/"
+run = "go build -trimpath -o bin/ ./cmd/..."
+
+[tasks.lint]
+description = "Format and lint with golangci-lint"
+run = [
+  "golangci-lint fmt ./...",
+  "golangci-lint run --fix ./...",
+  "cd bench && golangci-lint fmt ./... && golangci-lint run --fix ./...",
+]
+
+[tasks."lint:check"]
+description = "Lint without changing files (CI)"
+run = [
+  "golangci-lint fmt --diff ./...",
+  "golangci-lint run ./...",
+  "cd bench && golangci-lint fmt --diff ./... && golangci-lint run ./...",
+]
+
+[tasks.test]
+description = "Run the tests with the race detector"
+run = [
+  "go test -race -shuffle=on -covermode=atomic -coverprofile=coverage.out ./...",
+  # The benchmarks' own tests; the benchmarks themselves run with bench:context and bench:agent.
+  "cd bench && go test -race -shuffle=on ./...",
+]
+
+[tasks."docs:config"]
+description = "Regenerate docs/configuration.md from the flags"
+env = { UPDATE_CONFIG_DOC = "1" }
+run = "go test -count=1 -run '^TestConfigurationReference$' ./cmd/mcp-toolsearch-proxy/"
+
+[tasks."model:fetch"]
+description = "Download the built-in embedding model into .cache/model"
+run = "go run ./cmd/mcp-toolsearch-proxy fetch-model -model-dir .cache/model"
+
+[tasks."test:model"]
+description = "Test the built-in model against the reference implementation and the evaluation set"
+depends = ["model:fetch"]
+env = { TOOLSEARCH_MODEL_DIR = "{{config_root}}/.cache/model" }
+run = "go test -tags model -count=1 ./internal/embed/ ./internal/search/"
+
+[tasks."bench:context"]
+description = "What a client loads with and without the proxy: bytes, and tokens with ANTHROPIC_API_KEY (free)"
+depends = ["model:fetch"]
+dir = "bench"
+run = "go test -run '^$' -bench '^BenchmarkContext$' -benchtime 1x ."
+
+[tasks."bench:agent"]
+description = "The tasks against a model in each mode; needs ANTHROPIC_API_KEY, and its requests are billed"
+depends = ["model:fetch"]
+dir = "bench"
+env = { BENCH_AGENT = "1" }
+run = [
+  "mkdir -p ../.cache/bench",
+  "go test -run '^$' -bench '^BenchmarkAgent$' -benchtime 1x -count {{env.BENCH_COUNT | default(value='3')}} -timeout 0 . | tee ../.cache/bench/agent.txt",
+]
+
+[tasks."e2e:up"]
+description = "Start the end-to-end stack (agentgateway, the proxy, fixture MCP servers) with Docker Compose"
+run = [
+  "mkdir -p .cache/model",
+  # The proxy's container runs as an unprivileged user that writes the model here.
+  "chmod a+rwx .cache/model",
+  "docker compose -f tests/e2e/docker-compose.yaml up --build --detach",
+]
+
+[tasks."e2e:down"]
+description = "Stop the end-to-end stack"
+run = "docker compose -f tests/e2e/docker-compose.yaml down --volumes"
+
+[tasks."test:e2e"]
+description = "Run the end-to-end tests against the stack at E2E_SEARCH_URL and E2E_ALL_URL (default: e2e:up's)"
+run = "go test -tags e2e -count=1 ./tests/e2e/"
+
+[tasks."test:e2e".env]
+E2E_SEARCH_URL = "{{env.E2E_SEARCH_URL | default(value='http://127.0.0.1:3000/mcp/search')}}"
+E2E_ALL_URL = "{{env.E2E_ALL_URL | default(value='http://127.0.0.1:3000/mcp/all')}}"
+# The failClosed route's endpoints default to e2e:up's only when the stack
+# tested is e2e:up's; for another, its tests are skipped unless they are set.
+E2E_CLOSED_URL = "{% if env.E2E_SEARCH_URL == 'http://127.0.0.1:3000/mcp/search' %}{{env.E2E_CLOSED_URL | default(value='http://127.0.0.1:3000/mcp/search-closed')}}{% else %}{{env.E2E_CLOSED_URL | default(value='')}}{% endif %}"
+E2E_CLOSED_ALL_URL = "{% if env.E2E_SEARCH_URL == 'http://127.0.0.1:3000/mcp/search' %}{{env.E2E_CLOSED_ALL_URL | default(value='http://127.0.0.1:3000/mcp/closed')}}{% else %}{{env.E2E_CLOSED_ALL_URL | default(value='')}}{% endif %}"
+E2E_CLOSED_METRICS_URL = "{% if env.E2E_SEARCH_URL == 'http://127.0.0.1:3000/mcp/search' %}{{env.E2E_CLOSED_METRICS_URL | default(value='http://127.0.0.1:9090/metrics')}}{% else %}{{env.E2E_CLOSED_METRICS_URL | default(value='')}}{% endif %}"
+
+[tasks."actions:lock"]
+description = "Regenerate .github/workflows/actions.lock after changing workflows (needs gh and gh-actions-lock)"
+run = "gh actions-lock --no-interactive"
+
+[tasks.fuzz]
+description = "Fuzz the tokenizers for 30 s each"
+run = [
+  "go test ./internal/search -run '^$' -fuzz '^FuzzTokens$' -fuzztime 30s",
+  "go test ./internal/embed -run '^$' -fuzz '^FuzzEncode$' -fuzztime 30s",
+]
+
+[tasks.scan]
+description = "Scan for known vulnerabilities and leaked secrets"
+run = ["govulncheck ./...", "cd bench && govulncheck ./...", "gitleaks git --redact --no-banner"]
+
+[tasks."release:check"]
+description = "Check the release configuration and build archives and packages without publishing"
+run = ["goreleaser check", "goreleaser release --snapshot --clean --skip=publish,docker"]
+
+[tasks."release:check:all"]
+description = "As release:check, with the container images too (needs Docker with buildx)"
+run = ["goreleaser check", "goreleaser release --snapshot --clean --skip=publish"]
+
+[tasks.ci]
+description = "Everything CI runs"
+depends = ["lint:check", "scan", "test"]

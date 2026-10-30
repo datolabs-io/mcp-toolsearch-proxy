@@ -1,0 +1,30 @@
+# Binaries and test output
+dist/
+build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+**/bin/**
+*.out
+coverage.*
+*.coverprofile
+profile.cov
+
+# Local workspaces and settings
+go.work
+go.work.sum
+.env
+.env.*
+mise.local.toml
+
+# Real tool catalogs and query logs never enter the repository.
+captures/
+
+# The built-in model, downloaded for tests.
+.cache/
+
+# Local editor and tool settings
+.claude/

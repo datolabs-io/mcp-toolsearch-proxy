@@ -1,0 +1,68 @@
+# Node hooks get their own runtime, so commits work without `mise activate`.
+default_language_version:
+  node: "26.13.0"
+
+# Vendored modules are other people's code, kept as fetched.
+exclude: "^vendor/"
+
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-executables-have-shebangs
+      - id: check-illegal-windows-names
+      - id: check-merge-conflict
+      - id: check-shebang-scripts-are-executable
+      - id: check-symlinks
+      - id: end-of-file-fixer
+        exclude: "/testdata/"
+      - id: fix-byte-order-marker
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        exclude: "/testdata/"
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        exclude: "/testdata/"
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [--strict, feat, fix, chore, ci, docs, style, refactor, perf, test, build, revert]
+
+  - repo: https://github.com/streetsidesoftware/cspell-cli
+    rev: v10.4.0
+    hooks:
+      - id: cspell
+
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.50.0
+    hooks:
+      - id: markdownlint-fix
+        exclude: "^(CHANGELOG\\.md|\\.github/.*)$"
+
+  - repo: local
+    hooks:
+      - id: gitleaks
+        name: gitleaks
+        entry: mise x -- gitleaks git --pre-commit --staged --redact --no-banner
+        language: system
+        pass_filenames: false
+      - id: go-mod-vendor
+        name: go mod tidy and vendor
+        entry: mise run vendor
+        language: system
+        files: ^go\.(mod|sum)$
+        pass_filenames: false
+      - id: golangci-lint
+        name: golangci-lint
+        entry: mise run lint
+        language: system
+        types: [go]
+        pass_filenames: false

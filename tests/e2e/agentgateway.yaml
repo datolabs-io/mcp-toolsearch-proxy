@@ -1,0 +1,130 @@
+# yaml-language-server: $schema=https://agentgateway.dev/schema/config
+#
+# The gateway of the end-to-end tests, in the topology the proxy is built for:
+#
+#   client -> /mcp/search -> mcp-toolsearch-proxy -> /mcp/all -> MCP servers
+#
+# Both routes authenticate the caller's token. /mcp/search passes it on to the
+# proxy, which sends it back on /mcp/all, where the authorization rules decide
+# which tools that caller sees: alice every tool, bob only the weather tools.
+#
+# Host names are the services of docker-compose.yaml.
+binds:
+- port: 3000
+  listeners:
+  - routes:
+    - name: search
+      matches:
+      - path:
+          exact: /mcp/search
+      - path:
+          exact: /.well-known/oauth-protected-resource/mcp/search
+      policies:
+        mcpAuthentication:
+          mode: strict
+          issuer: https://issuer.e2e.test
+          audiences: [http://localhost:3000/mcp/search]
+          jwks:
+            file: ./testdata/jwks.json
+          resourceMetadata:
+            resource: http://localhost:3000/mcp/search
+            bearerMethodsSupported: [header]
+        backendAuth:
+          passthrough: {}
+      backends:
+      - mcp:
+          statefulMode: stateless
+          # The proxy's four tools keep their own names.
+          prefixMode: never
+          targets:
+          - name: toolsearch
+            mcp:
+              host: http://proxy:8000/mcp
+    - name: all
+      matches:
+      - path:
+          exact: /mcp/all
+      policies:
+        mcpAuthentication:
+          mode: strict
+          issuer: https://issuer.e2e.test
+          audiences: [http://localhost:3000/mcp/search]
+          jwks:
+            file: ./testdata/jwks.json
+          resourceMetadata:
+            resource: http://localhost:3000/mcp/all
+            bearerMethodsSupported: [header]
+        mcpAuthorization:
+          rules:
+          - 'jwt.sub == "alice"'
+          - 'jwt.sub == "bob" && mcp.tool.target == "weather"'
+        # The fixture servers answer with one JSON body, so their slow tool
+        # needs more than the gateway's default 10 s for headers. The route
+        # to the proxy keeps the default: the proxy sends its headers at once.
+        timeout:
+          backendRequestTimeout: 60s
+      backends:
+      - mcp:
+          statefulMode: stateless
+          prefixMode: always
+          targets:
+          - name: weather
+            mcp:
+              host: http://weather:8000/mcp
+          - name: admin
+            mcp:
+              host: http://admin:8000/mcp
+    # /mcp/search-closed and /mcp/closed repeat the two routes above for a
+    # second proxy, in front of a server that stops listing its tools after
+    # the first listing. failClosed, the default, is spelled out: one server
+    # refusing tools/list fails the whole listing.
+    - name: search-closed
+      matches:
+      - path:
+          exact: /mcp/search-closed
+      policies:
+        mcpAuthentication:
+          mode: strict
+          issuer: https://issuer.e2e.test
+          audiences: [http://localhost:3000/mcp/search]
+          jwks:
+            file: ./testdata/jwks.json
+          resourceMetadata:
+            resource: http://localhost:3000/mcp/search-closed
+            bearerMethodsSupported: [header]
+        backendAuth:
+          passthrough: {}
+      backends:
+      - mcp:
+          statefulMode: stateless
+          prefixMode: never
+          targets:
+          - name: toolsearch
+            mcp:
+              host: http://proxy-closed:8000/mcp
+    - name: closed
+      matches:
+      - path:
+          exact: /mcp/closed
+      policies:
+        mcpAuthentication:
+          mode: strict
+          issuer: https://issuer.e2e.test
+          audiences: [http://localhost:3000/mcp/search]
+          jwks:
+            file: ./testdata/jwks.json
+          resourceMetadata:
+            resource: http://localhost:3000/mcp/closed
+            bearerMethodsSupported: [header]
+      backends:
+      - mcp:
+          statefulMode: stateless
+          prefixMode: always
+          failureMode: failClosed
+          targets:
+          - name: weather
+            mcp:
+              host: http://weather:8000/mcp
+          - name: billing
+            mcp:
+              host: http://billing:8000/mcp

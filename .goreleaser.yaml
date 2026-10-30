@@ -1,0 +1,146 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: mcp-toolsearch-proxy
+
+before:
+  hooks:
+    - sh packaging/collect-licenses.sh
+
+builds:
+  - id: mcp-toolsearch-proxy
+    main: ./cmd/mcp-toolsearch-proxy
+    binary: mcp-toolsearch-proxy
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath, -mod=vendor]
+    ldflags: ["-s -w -X main.version={{ .Version }}"]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - ids: [mcp-toolsearch-proxy]
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - docs/deploy.md
+      - docs/privacy.md
+      - docs/agentgateway.md
+      - docs/clients.md
+      - docs/configuration.md
+      # The binary links the vendored modules: their licences and notices
+      # travel with it, under the modules' paths.
+      - src: build/licenses/vendor/**/*
+        dst: licenses
+
+nfpms:
+  - id: packages
+    ids: [mcp-toolsearch-proxy]
+    package_name: mcp-toolsearch-proxy
+    file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [deb, rpm]
+    vendor: MB Datolabs
+    homepage: https://github.com/datolabs-io/mcp-toolsearch-proxy
+    maintainer: MB Datolabs
+    description: MCP proxy that searches a large tool catalog with four tools.
+    license: MIT
+    section: net
+    umask: 0o022
+    bindir: /usr/bin
+    contents:
+      - src: packaging/mcp-toolsearch-proxy.service
+        dst: /usr/lib/systemd/system/mcp-toolsearch-proxy.service
+      - src: packaging/sysusers.conf
+        dst: /usr/lib/sysusers.d/mcp-toolsearch-proxy.conf
+      - src: packaging/env
+        dst: /etc/mcp-toolsearch-proxy/env
+        type: config|noreplace
+        file_info:
+          mode: 0640
+      - src: docs/deploy.md
+        dst: /usr/share/doc/mcp-toolsearch-proxy/deploy.md
+      - src: docs/privacy.md
+        dst: /usr/share/doc/mcp-toolsearch-proxy/privacy.md
+      - src: docs/agentgateway.md
+        dst: /usr/share/doc/mcp-toolsearch-proxy/agentgateway.md
+      - src: docs/clients.md
+        dst: /usr/share/doc/mcp-toolsearch-proxy/clients.md
+      - src: docs/configuration.md
+        dst: /usr/share/doc/mcp-toolsearch-proxy/configuration.md
+      - src: build/licenses
+        dst: /usr/share/doc/mcp-toolsearch-proxy/licenses
+        type: tree
+    scripts:
+      postinstall: packaging/postinstall.sh
+      preremove: packaging/preremove.sh
+      postremove: packaging/postremove.sh
+
+dockers_v2:
+  - id: image
+    ids: [mcp-toolsearch-proxy]
+    images: ["ghcr.io/datolabs-io/mcp-toolsearch-proxy"]
+    tags:
+      - "{{ .Version }}"
+      - "{{ .Major }}.{{ .Minor }}"
+      - latest
+    platforms: [linux/amd64, linux/arm64]
+    extra_files: [build/licenses, packaging/model]
+    labels:
+      org.opencontainers.image.title: mcp-toolsearch-proxy
+      org.opencontainers.image.description: MCP proxy that searches a large tool catalog with four tools
+      org.opencontainers.image.source: https://github.com/datolabs-io/mcp-toolsearch-proxy
+      org.opencontainers.image.licenses: MIT
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.created: "{{ .Date }}"
+
+homebrew_casks:
+  - name: mcp-toolsearch-proxy
+    binaries: [mcp-toolsearch-proxy]
+    homepage: https://github.com/datolabs-io/mcp-toolsearch-proxy
+    description: MCP proxy that searches a large tool catalog with four tools
+    license: MIT
+    caveats: |
+      Download the built-in search model once (about 530 MB):
+        mcp-toolsearch-proxy fetch-model
+      Then run the proxy in front of an MCP server:
+        mcp-toolsearch-proxy -upstream https://gateway.example.com/mcp/all
+    # The binaries are not notarized; without this macOS refuses to run them.
+    hooks:
+      post:
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/mcp-toolsearch-proxy"]
+          end
+    # Release candidates are not offered to Homebrew users.
+    skip_upload: auto
+    commit_msg_template: "feat: mcp-toolsearch-proxy {{ .Tag }}"
+    # The datolabs-automation App, through HOMEBREW_TAP_TOKEN, pushes the cask
+    # to the tap's main branch; any ruleset there must let it bypass the pull
+    # request rule.
+    repository:
+      owner: datolabs-io
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+
+sboms:
+  - artifacts: archive
+  - id: packages
+    artifacts: package
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  disable: true # release-please writes the release notes
+
+# release-please creates the release as a draft with its tag, since a
+# published release cannot take assets any more; this fills it and then
+# publishes it.
+release:
+  mode: keep-existing
+  use_existing_draft: true
+  draft: false

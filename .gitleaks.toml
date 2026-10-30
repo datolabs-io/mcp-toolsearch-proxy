@@ -1,0 +1,15 @@
+title = "mcp-toolsearch-proxy"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Key and tokens minted for the end-to-end fixture stack; they grant nothing elsewhere"
+paths = ['''^tests/e2e/testdata/''']
+
+[[allowlists]]
+description = "SHA-256 digests of the built-in model's public files"
+regexes = [
+  '''19f1909063da3cfe3bd83a782381f040dccea475f4816de11116444a73e1b6a1''',
+  '''14b5eb39cb4ce5666da8ad1f3dc6be4346e9b2d601c073302fa0a31bf7943397''',
+]

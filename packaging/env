@@ -1,0 +1,68 @@
+# Environment for mcp-toolsearch-proxy.service. See `mcp-toolsearch-proxy -h`
+# or /usr/share/doc/mcp-toolsearch-proxy/configuration.md for every setting.
+# The proxy has no authentication of its own: expose it only behind a gateway
+# that authenticates clients and passes their token on.
+MCP_ADDR=127.0.0.1:8000
+# The MCP server whose tools are searched, such as a gateway's aggregated
+# endpoint. Every request to it carries the caller's own Authorization header.
+TOOLSEARCH_UPSTREAM=
+# Host header for upstream requests, when the upstream is reached at an
+# internal address but its servers accept only the public name.
+# TOOLSEARCH_UPSTREAM_HOST=mcp.example.com
+# MCP version spoken upstream: latest, or a version such as 2025-11-25 when
+# the upstream fails the newest handshake.
+# TOOLSEARCH_UPSTREAM_PROTOCOL=latest
+# Characters of the upstream server's instructions forwarded in the
+# handshake (0 for none), and how many of the best search matches come with
+# their input schemas (0 for none).
+# TOOLSEARCH_MAX_INSTRUCTIONS=10000
+# TOOLSEARCH_SEARCH_SCHEMAS=3
+# How many read-only calls call_read_tools takes in one request, up to 50;
+# 0 leaves the tool out.
+# TOOLSEARCH_MAX_BATCH_CALLS=10
+# Upstream tools always treated as writes, whatever the upstream marks them:
+# comma-separated names or patterns. call_read_tool refuses them.
+# TOOLSEARCH_WRITE_TOOLS=github_*,mail_send
+# builtin needs the model: run `mcp-toolsearch-proxy fetch-model` as the
+# service user once, with runuser (see /usr/share/doc/mcp-toolsearch-proxy/deploy.md), or
+# set none to search lexically only.
+# TOOLSEARCH_EMBEDDER=builtin
+# TOOLSEARCH_MODEL_DIR=/var/lib/mcp-toolsearch-proxy/model
+# How long a caller's catalog is used before the tools are listed again. An
+# older one stays in use while they are listed again in the background, and
+# while that fails, up to the max age (0 for six times the TTL). The
+# read-only check of call_read_tool reads this catalog, so it may lag the
+# upstream's readOnlyHint by up to the max age.
+# TOOLSEARCH_CATALOG_TTL=10m
+# TOOLSEARCH_CATALOG_MAX_AGE=0
+# How many callers' catalogs are kept; each takes several MB, and every new
+# token is a new caller. One past the max age is dropped.
+# TOOLSEARCH_MAX_CATALOGS=16
+# TOOLSEARCH_CALL_TIMEOUT=2m
+# How long calls in flight get to finish when the service stops; empty for
+# the call timeout plus 15s. Keep TimeoutStopSec= in the unit above it.
+# MCP_SHUTDOWN_GRACE=
+# How many times a failed listing of the upstream's tools is tried again
+# (0 for none). Tool calls are never retried.
+# TOOLSEARCH_LIST_RETRIES=3
+# How long a listing may take, retries included, and how long a handshake
+# waits for a new caller's catalog to forward the upstream's instructions.
+# TOOLSEARCH_LIST_TIMEOUT=15s
+# TOOLSEARCH_HANDSHAKE_WAIT=3s
+# Memory bounds. Requests in flight, by count and by bytes of their bodies;
+# a call holds about ten times its body while it is served. The most bytes
+# taken from the upstream for one call's result, or for a whole listing, and
+# the most tools a listing may hold.
+# MCP_MAX_IN_FLIGHT=8
+# MCP_MAX_IN_FLIGHT_BYTES=32MiB
+# TOOLSEARCH_MAX_RESPONSE_BYTES=32MiB
+# TOOLSEARCH_MAX_TOOLS=10000
+# MCP_METRICS_ADDR=127.0.0.1:9464
+# MCP_ALLOWED_HOSTS=
+# Logging: debug, info, warn or error; text or json.
+# MCP_LOG_LEVEL=info
+# MCP_LOG_FORMAT=text
+# The unit sets GOMEMLIMIT=450MiB, a little below its MemoryMax=512M, so
+# garbage is collected harder before the kernel kills the service. Raise both
+# together, with a drop-in for MemoryMax=.
+# GOMEMLIMIT=450MiB

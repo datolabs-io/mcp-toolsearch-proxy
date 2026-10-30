@@ -1,0 +1,213 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read # paths-filter lists PR files through the API
+    outputs:
+      # Only pull requests are filtered; pushes and merge queue runs test everything.
+      src: ${{ github.event_name != 'pull_request' || steps.filter.outputs.src == 'true' }}
+    steps:
+      - uses: dorny/paths-filter@v4.0.3
+        if: github.event_name == 'pull_request'
+        id: filter
+        with:
+          filters: |
+            src:
+              - '**/*.go'
+              - '**/go.mod'
+              - '**/go.sum'
+              - '**/testdata/**'
+              - 'vendor/**'
+              - '.golangci.yaml'
+              - '.gitleaks.toml'
+              - '.mise.toml'
+              - 'mise.lock'
+              - '.goreleaser.yaml'
+              - 'Dockerfile'
+              - 'packaging/**'
+              - 'tests/**'
+              - 'bench/**'
+              - '.github/workflows/ci.yaml'
+
+  lint:
+    name: Lint
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v5.2.4
+        with:
+          cache: true
+          cache_key_prefix: mise-v2
+      - run: mise run lint:check
+      - uses: docker/setup-buildx-action@v4.4.1
+      - run: mise run release:check:all
+
+  # The commit hooks, for every change: a commit made without them, by a
+  # contributor who did not install them or by a bot, gets the same checks.
+  # gitleaks and the Go hooks run as the Scan and Lint jobs instead.
+  hooks:
+    name: Pre-commit hooks
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v5.2.4
+        with:
+          cache: true
+          cache_key_prefix: mise-v2
+          install_args: pre-commit
+      - uses: actions/cache@v6.1.0
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      - run: pre-commit run --all-files --show-diff-on-failure
+        env:
+          SKIP: gitleaks,go-mod-vendor,golangci-lint
+
+  scan:
+    name: Scan
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@v5.2.4
+        with:
+          cache: true
+          cache_key_prefix: mise-v2
+      - run: mise run scan
+
+  test:
+    name: Test (Go ${{ matrix.go }})
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    env:
+      # Do not install the other tools (linters, hooks) when a task runs.
+      MISE_TASK_RUN_AUTO_INSTALL: "false"
+    strategy:
+      fail-fast: false
+      matrix:
+        # "mise" is the toolchain pinned in .mise.toml (latest stable);
+        # the other entry is oldstable, the oldest release we support.
+        go: [mise, "1.26"]
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Override the Go version
+        if: matrix.go != 'mise'
+        env:
+          GO_VERSION: ${{ matrix.go }}
+        run: echo "MISE_GO_VERSION=${GO_VERSION}" >> "$GITHUB_ENV"
+      # Only Go is needed to test. With mise.lock present the action installs
+      # in locked mode, which only knows the versions pinned in .mise.toml, so
+      # the overridden Go is installed by a separate step; mise still checks
+      # it against the checksum published with the Go release.
+      - uses: jdx/mise-action@v5.2.4
+        with:
+          install: ${{ matrix.go == 'mise' }}
+          install_args: go
+          cache: ${{ matrix.go == 'mise' }}
+          cache_key_prefix: mise-v2-test
+      - name: Install the overridden Go
+        if: matrix.go != 'mise'
+        run: mise install go
+      - run: go version
+      - run: mise run test
+
+  model:
+    name: Built-in model
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    env:
+      MISE_TASK_RUN_AUTO_INSTALL: "false"
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v5.2.4
+        with:
+          install_args: go
+          cache: true
+          cache_key_prefix: mise-v2-test
+      # The model's files are pinned by digest in internal/embed/fetch.go,
+      # so that file keys the cache; fetch-model checks the digests anyway.
+      - uses: actions/cache@v6.1.0
+        with:
+          path: .cache/model
+          key: model-${{ hashFiles('internal/embed/fetch.go') }}
+      - run: mise run test:model
+
+  e2e:
+    name: End-to-end
+    needs: [changes]
+    if: needs.changes.outputs.src == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    env:
+      MISE_TASK_RUN_AUTO_INSTALL: "false"
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v5.2.4
+        with:
+          install_args: go
+          cache: true
+          cache_key_prefix: mise-v2-test
+      - uses: actions/cache@v6.1.0
+        with:
+          path: .cache/model
+          key: model-${{ hashFiles('internal/embed/fetch.go') }}
+      - run: mise run e2e:up
+      - run: mise run test:e2e
+      - name: Show the stack's logs
+        if: failure()
+        run: docker compose -f tests/e2e/docker-compose.yaml logs --no-color
+      - if: always()
+        run: mise run e2e:down
+
+  ci-ok:
+    name: CI OK
+    if: always()
+    needs: [changes, hooks, lint, scan, test, model, e2e]
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any required job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
