@@ -458,8 +458,10 @@ func (s *Store) refresh(ctx context.Context, key, authorization string, since ti
 }
 
 // build lists the caller's tools and keeps the catalog made of them, or
-// remembers that it failed. When another build finished or failed after
-// since, when the caller decided to list, its result answers instead.
+// remembers that it failed. When another build finished or failed since
+// the caller decided to list, at since or later, its result answers
+// instead: a clock that has not moved in between, coarse or a test's,
+// gives that result the very time since.
 func (s *Store) build(ctx context.Context, key, authorization string, since time.Time) (*Catalog, error) {
 	v, err, _ := s.group.Do(key, func() (any, error) {
 		s.mu.Lock()
@@ -467,9 +469,9 @@ func (s *Store) build(ctx context.Context, key, authorization string, since time
 		f, failed := s.failures[key]
 		s.mu.Unlock()
 		switch {
-		case built && last.built.After(since):
+		case built && !last.built.Before(since):
 			return last, nil
-		case failed && f.at.After(since):
+		case failed && !f.at.Before(since):
 			return nil, f.err
 		}
 		// The build outlives a caller that gives up, so the others waiting
