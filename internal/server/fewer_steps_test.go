@@ -469,14 +469,14 @@ func TestCallReadsLeavesOutResultsPastTheResponseLimit(t *testing.T) {
 func TestCallReadsKeepsTheResponseAliveBehindAProxyThatWaitsForHeaders(t *testing.T) {
 	t.Parallel()
 	g := newGate()
-	g.slow = 800 * time.Millisecond
+	g.slow = slowCall
 	list := catalog.Tools(func(context.Context, string) ([]*mcp.Tool, error) {
 		return []*mcp.Tool{tool("slow", &mcp.ToolAnnotations{ReadOnlyHint: true})}, nil
 	})
 	opts := &server.Options{KeepAlive: 100 * time.Millisecond}
 	ts := httptest.NewServer(server.ProxyHandler(opts, catalog.NewStore(list, nil), g))
 	t.Cleanup(ts.Close)
-	cs := connect(t, impatientFront(t, ts.URL, 300*time.Millisecond).URL+"/mcp")
+	cs := connect(t, impatientFront(t, ts.URL, frontWait).URL+"/mcp")
 
 	res := rawCall(t, cs, server.ToolCallReads, `{"calls":[{"name":"slow"},{"name":"slow"}]}`)
 
