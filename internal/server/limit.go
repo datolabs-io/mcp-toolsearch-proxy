@@ -1,8 +1,13 @@
 package server
 
 import (
+	"context"
+	"errors"
 	"net/http"
+	"strings"
 	"sync"
+
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // DefaultMaxInFlight is how many requests the MCP endpoint serves at once
@@ -30,24 +35,9 @@ const retryAfter = "1"
 // rejected of each refusal, for either reason, and inFlight of each request
 // it starts (1) and finishes (-1).
 func limit(n int, budget int64, next http.Handler, rejected func(), inFlight func(delta int)) http.Handler {
-	var (
-		mu    sync.Mutex
-		count int
-		used  int64
-	)
+	sl := &slots{n: n, budget: budget}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		weight := r.ContentLength
-		if weight < 0 || weight > MaxRequestBytes {
-			weight = MaxRequestBytes
-		}
-		weight = min(weight, budget)
-		mu.Lock()
-		ok := count < n && used+weight <= budget
-		if ok {
-			count++
-			used += weight
-		}
-		mu.Unlock()
+		release, ok := sl.take(r.ContentLength)
 		if !ok {
 			rejected()
 			// Closing the connection lets the refusal go out at once:
@@ -62,11 +52,72 @@ func limit(n int, budget int64, next http.Handler, rejected func(), inFlight fun
 		// exceeds n.
 		defer func() {
 			inFlight(-1)
-			mu.Lock()
-			count--
-			used -= weight
-			mu.Unlock()
+			release()
 		}()
 		next.ServeHTTP(w, r)
 	})
+}
+
+// errBusy refuses a request beyond the limits over a transport without
+// HTTP, as limit's 503 does over HTTP.
+var errBusy = errors.New("the server is busy; try again shortly")
+
+// limitRequests is limit for a transport without HTTP, as a middleware:
+// requests, notifications aside, are served at most n at a time, weighing
+// MaxRequestBytes each against budget, since their size is not known, and
+// refused with errBusy beyond that.
+func limitRequests(n int, budget int64, rejected func(), inFlight func(delta int)) mcp.Middleware {
+	sl := &slots{n: n, budget: budget}
+	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			if strings.HasPrefix(method, "notifications/") {
+				return next(ctx, method, req)
+			}
+			release, ok := sl.take(-1)
+			if !ok {
+				rejected()
+				return nil, errBusy
+			}
+			inFlight(1)
+			defer func() {
+				inFlight(-1)
+				release()
+			}()
+			return next(ctx, method, req)
+		}
+	}
+}
+
+// slots counts requests in flight, at most n, and the bytes they weigh,
+// at most budget.
+type slots struct {
+	n      int
+	budget int64
+	mu     sync.Mutex
+	count  int
+	used   int64
+}
+
+// take reserves a slot for a request of size bytes, or MaxRequestBytes
+// when size is negative or larger, and at most the whole budget, and
+// returns the function that releases it; ok is false when none is free.
+func (s *slots) take(size int64) (func(), bool) {
+	weight := size
+	if weight < 0 || weight > MaxRequestBytes {
+		weight = MaxRequestBytes
+	}
+	weight = min(weight, s.budget)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.count >= s.n || s.used+weight > s.budget {
+		return nil, false
+	}
+	s.count++
+	s.used += weight
+	return func() {
+		s.mu.Lock()
+		s.count--
+		s.used -= weight
+		s.mu.Unlock()
+	}, true
 }

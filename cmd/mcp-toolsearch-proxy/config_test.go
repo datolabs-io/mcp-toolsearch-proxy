@@ -24,6 +24,7 @@ func TestConfigDefaults(t *testing.T) {
 	assert.Equal(t, cmdServe, cfg.command)
 	assert.Equal(t, "127.0.0.1:8000", cfg.addr)
 	assert.Equal(t, "/mcp", cfg.path)
+	assert.Equal(t, transportHTTP, cfg.transport)
 	assert.Equal(t, embedBuiltin, cfg.embedder)
 	assert.Equal(t, "/var/lib/p/model", cfg.modelDir)
 	assert.Equal(t, 10*time.Minute, cfg.catalogTTL)
@@ -142,6 +143,20 @@ func TestConfigFetchModelNeedsNoUpstream(t *testing.T) {
 	assert.Equal(t, "/tmp/m", cfg.modelDir)
 }
 
+func TestConfigTransport(t *testing.T) {
+	t.Parallel()
+	base := []string{"-upstream", "http://gw/mcp", "-model-dir", "/m"}
+
+	cfg, err := parseConfig(base, envOf(map[string]string{"MCP_TRANSPORT": "stdio"}), &bytes.Buffer{})
+	require.NoError(t, err)
+	assert.Equal(t, transportStdio, cfg.transport)
+
+	cfg, err = parseConfig(append(base, "-transport", "http"), envOf(map[string]string{"MCP_TRANSPORT": "stdio"}),
+		&bytes.Buffer{})
+	require.NoError(t, err)
+	assert.Equal(t, transportHTTP, cfg.transport, "the flag wins")
+}
+
 func TestConfigRefusesBadSettings(t *testing.T) {
 	t.Parallel()
 	base := []string{"-upstream", "http://gw/mcp", "-model-dir", "/m"}
@@ -181,6 +196,7 @@ func TestConfigRefusesBadSettings(t *testing.T) {
 		append(base, "-max-response-bytes", "32MB"),
 		append(base, "-max-in-flight-bytes", "-1KiB"),
 		append(base, "-max-tools", "0"),
+		append(base, "-transport", "sse"),
 		append(base, "extra"),
 		{"-upstream", "http://gw/mcp"},
 	} {

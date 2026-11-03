@@ -66,6 +66,9 @@ search directly.
 Logs and metrics record tool names, outcomes and timings. Queries, arguments, results and tokens never appear in
 them; [docs/privacy.md](docs/privacy.md) has the details. The transport is streamable HTTP without sessions, for
 MCP 2026-07-28 clients and older ones, so a restart or a load balancer doesn't break a client's connection.
+`-transport stdio` serves the same tools on standard input and output instead, for clients that start servers as local
+commands. There is no caller's token there, and the proxy has none of its own, so stdio works only with an upstream
+that needs no authentication ([docs/clients.md](docs/clients.md#over-stdio)).
 
 It works with any upstream that speaks streamable HTTP MCP and authorizes by bearer token.
 [docs/agentgateway.md](docs/agentgateway.md) shows a complete [agentgateway](https://agentgateway.dev) setup, which

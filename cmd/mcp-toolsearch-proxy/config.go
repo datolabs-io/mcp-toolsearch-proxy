@@ -51,6 +51,12 @@ const shutdownMargin = 15 * time.Second
 // protocolLatest asks for the newest MCP version the SDK supports.
 const protocolLatest = "latest"
 
+// Transports the proxy serves MCP over.
+const (
+	transportHTTP  = "http"
+	transportStdio = "stdio"
+)
+
 // Log formats.
 const (
 	logText = "text"
@@ -59,6 +65,7 @@ const (
 
 type config struct {
 	command      string
+	transport    string
 	addr         string
 	path         string
 	metricsAddr  string
@@ -155,7 +162,7 @@ func parseConfigWith(
 	searchSchemas = env("TOOLSEARCH_SEARCH_SCHEMAS", strconv.Itoa(defaultSearchSchemas))
 	fs.StringVar(&searchSchemas, "search-schemas", searchSchemas,
 		"how many of the best search matches come with their input schemas; 0 for none (TOOLSEARCH_SEARCH_SCHEMAS)")
-	batch := batchFlag(fs, env)
+	batch, transport := batchFlag(fs, env), transportFlag(fs, env)
 	callTimeout = env("TOOLSEARCH_CALL_TIMEOUT", upstream.DefaultCallTimeout.String())
 	fs.StringVar(&callTimeout, "call-timeout", callTimeout,
 		"how long a call to an upstream tool may take (TOOLSEARCH_CALL_TIMEOUT)")
@@ -186,6 +193,7 @@ func parseConfigWith(
 		func() error { return shutdown(&cfg) },
 		func() error { return cfg.settleCounts(maxInstructions, searchSchemas, listRetries) },
 		func() error { return batch(&cfg) },
+		func() error { return transport(&cfg) },
 		func() error { return timings(&cfg) },
 		func() error { return allowed(&cfg) },
 		func() error { return writes(&cfg) },
@@ -256,6 +264,24 @@ func (c *config) settle(inFlight, ttl, maxCatalogs, callTimeout string) error {
 		return fmt.Errorf("-call-timeout: %q is not a positive duration", callTimeout)
 	}
 	return nil
+}
+
+// transportFlag adds the flag of the transport MCP is served over to fs,
+// and returns the function that checks it and sets it in a config once fs
+// is parsed.
+func transportFlag(fs *flag.FlagSet, env func(name, fallback string) string) func(*config) error {
+	transport := env("MCP_TRANSPORT", transportHTTP)
+	fs.StringVar(&transport, "transport", transport,
+		"http to serve streamable HTTP at -addr and -path, or stdio to speak MCP on standard input and output, "+
+			"where there is no caller's token: upstream requests then carry no Authorization header, so only an "+
+			"upstream that needs none can be served (MCP_TRANSPORT)")
+	return func(c *config) error {
+		if transport != transportHTTP && transport != transportStdio {
+			return fmt.Errorf("-transport: %q is not http or stdio", transport)
+		}
+		c.transport = transport
+		return nil
+	}
 }
 
 // shutdownFlag adds the flag of the shutdown grace to fs, and returns the

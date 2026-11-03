@@ -38,6 +38,32 @@
           "choices": ["builtin", "none"]
         }
       ]
+    },
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/datolabs-io/mcp-toolsearch-proxy:0.8.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "MCP_TRANSPORT",
+          "description": "stdio: MCP on standard input and output. Upstream requests then carry no token, so this suits only an upstream that needs no authentication",
+          "value": "stdio",
+          "isRequired": true
+        },
+        {
+          "name": "TOOLSEARCH_UPSTREAM",
+          "description": "Streamable HTTP URL of an MCP server that needs no authentication",
+          "isRequired": true
+        },
+        {
+          "name": "TOOLSEARCH_EMBEDDER",
+          "description": "builtin for semantic search, which needs the model in a volume at /model (see docs/deploy.md); none for lexical search only",
+          "default": "none",
+          "choices": ["builtin", "none"]
+        }
+      ]
     }
   ]
 }
