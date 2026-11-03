@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.datolabs-io/mcp-toolsearch-proxy",
+  "title": "Tool Search Proxy",
+  "description": "Lets a model search and call a large MCP tool catalog through five tools instead of loading it",
+  "repository": {
+    "url": "https://github.com/datolabs-io/mcp-toolsearch-proxy",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/datolabs-io/mcp-toolsearch-proxy#readme",
+  "version": "0.8.1",
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/datolabs-io/mcp-toolsearch-proxy:0.8.1",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://localhost:8000/mcp"
+      },
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "-p",
+          "value": "8000:8000",
+          "description": "Publish the proxy's port"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "TOOLSEARCH_UPSTREAM",
+          "description": "Streamable HTTP URL of the MCP server whose tools are searched, such as a gateway",
+          "isRequired": true
+        },
+        {
+          "name": "TOOLSEARCH_EMBEDDER",
+          "description": "builtin for semantic search, which needs the model in a volume at /model (see docs/deploy.md); none for lexical search only",
+          "default": "none",
+          "choices": ["builtin", "none"]
+        }
+      ]
+    }
+  ]
+}
