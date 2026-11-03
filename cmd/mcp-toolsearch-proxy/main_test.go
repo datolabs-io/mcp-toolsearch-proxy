@@ -237,6 +237,7 @@ func TestOptionsCarryEverySetting(t *testing.T) {
 		"maxBatchCalls":               {cfg.maxBatchCalls, srv.MaxBatchCalls},
 		"callTimeout of a batch":      {cfg.callTimeout, srv.CallTimeout},
 		"maxResponseBytes of a batch": {cfg.maxResponseBytes, srv.MaxResponseBytes},
+		"shutdownGrace":               {cfg.shutdownGrace, srv.ShutdownGrace},
 	} {
 		assert.NotZero(t, pair[0], "%s: set it to something other than its default", field)
 		assert.Equal(t, pair[0], pair[1], field)
@@ -250,14 +251,14 @@ func TestOptionsCarryEverySetting(t *testing.T) {
 	// The settings options does not take are used by serve and run
 	// themselves. A new setting must be added to one list or the other.
 	elsewhere := []string{
-		"command", "transport", "addr", "metricsAddr", "upstream", "embedder", "modelDir", "shutdownGrace", "logLevel",
+		"command", "transport", "addr", "metricsAddr", "upstream", "embedder", "modelDir", "logLevel",
 		"logFormat",
 	}
 	passed := []string{
 		"upstreamHost", "upstreamProtocol", "callTimeout", "listRetries", "listTimeout", "maxResponseBytes",
 		"maxTools", "catalogTTL", "catalogMaxAge", "maxCatalogs", "path", "maxInFlight", "allowedOrigins",
 		"allowedHosts", "maxInstructions", "searchSchemas", "handshakeWait", "writeTools", "maxInFlightBytes",
-		"maxBatchCalls",
+		"maxBatchCalls", "shutdownGrace",
 	}
 	for f := range reflect.TypeFor[config]().Fields() {
 		assert.True(t, slices.Contains(passed, f.Name) || slices.Contains(elsewhere, f.Name),

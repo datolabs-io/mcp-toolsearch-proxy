@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
@@ -121,4 +123,67 @@ func TestServeEndsWhenTheClientGoesAway(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, cs.Close())
 	require.NoError(t, <-done)
+}
+
+// serveInMemory runs Serve with opts over g until the test ends, and
+// returns a connected client and the channel Serve's result arrives on.
+func serveInMemory(
+	ctx context.Context, t *testing.T, opts *server.Options, g *gate,
+) (*mcp.ClientSession, <-chan error) {
+	t.Helper()
+	store := catalog.NewStore(catalog.Tools(g.list), nil)
+	serverT, clientT := mcp.NewInMemoryTransports()
+	done := make(chan error, 1)
+	go func() { done <- server.Serve(ctx, opts, store, g, serverT) }()
+	client := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "0"}, nil)
+	cs, err := client.Connect(t.Context(), clientT, nil)
+	require.NoError(t, err)
+	return cs, done
+}
+
+// Over a transport without HTTP, as over HTTP, a request beyond
+// MaxInFlight is refused rather than served, and counted.
+func TestServeLimitsRequestsInFlight(t *testing.T) {
+	t.Parallel()
+	g := newGate()
+	var rejected atomic.Int32
+	cs, _ := serveInMemory(t.Context(), t, &server.Options{
+		MaxInFlight: 1, OnRejected: func() { rejected.Add(1) },
+	}, g)
+	held := make(chan error, 1)
+	go func() {
+		_, err := cs.CallTool(t.Context(), callParams("hold", nil))
+		held <- err
+	}()
+	<-g.entered
+
+	_, err := cs.CallTool(t.Context(), callParams("echo", map[string]any{"text": "hi"}))
+	require.ErrorContains(t, err, "busy")
+	assert.Equal(t, int32(1), rejected.Load())
+
+	close(g.open)
+	require.NoError(t, <-held)
+	res, err := cs.CallTool(t.Context(), callParams("echo", map[string]any{"text": "hi"}))
+	require.NoError(t, err)
+	assert.False(t, res.IsError)
+}
+
+// When ctx is done, a call still running gets ShutdownGrace to finish, and
+// Serve returns after it whether or not the call has.
+func TestServeStopsWithinTheGrace(t *testing.T) {
+	t.Parallel()
+	g := newGate()
+	t.Cleanup(func() { close(g.open) })
+	ctx, cancel := context.WithCancel(t.Context())
+	cs, done := serveInMemory(ctx, t, &server.Options{ShutdownGrace: 50 * time.Millisecond}, g)
+	go func() { _, _ = cs.CallTool(t.Context(), callParams("hold", nil)) }()
+	<-g.entered
+
+	cancel()
+	select {
+	case err := <-done:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Serve did not stop within the grace")
+	}
 }

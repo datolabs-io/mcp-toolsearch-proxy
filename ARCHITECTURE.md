@@ -174,7 +174,10 @@ their origin is listed, and off loopback the `Host` header is checked against a 
 `-transport stdio` serves the same server on standard input and output instead, for clients that start servers as
 commands. The handshake carries the upstream's instructions as over HTTP. There is no caller's token there and the
 proxy takes none (ADR 9), so every request upstream goes without `Authorization`, and only an upstream that needs no
-credential can be served. Logs go to standard error, as always; `-metrics-addr` still serves metrics over HTTP.
+credential can be served. The same limits hold: at most `-max-in-flight` requests at once, each weighing the largest
+body allowed against `-max-in-flight-bytes` since its size is not known, and a frame at most that large. When the
+proxy stops, requests running get `-shutdown-grace` to finish. Logs go to standard error, as always; `-metrics-addr`
+still serves metrics over HTTP.
 
 ## Configuration
 

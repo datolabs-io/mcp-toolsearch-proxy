@@ -125,6 +125,9 @@ type Options struct {
 	// together, as the upstream client bounds each; zero means
 	// upstream.DefaultMaxResponseBytes.
 	MaxResponseBytes int64
+	// ShutdownGrace is how long Serve, once its context is done, gives the
+	// requests running to finish before it returns; zero returns at once.
+	ShutdownGrace time.Duration
 	// KeepAlive is how often a response waiting on the upstream server
 	// sends a comment, so that proxies in front see it is alive; zero means
 	// DefaultKeepAlive.
@@ -280,7 +283,11 @@ func Serve(ctx context.Context, opts *Options, store *catalog.Store, caller Call
 	if o.MaxInstructions > 0 {
 		upstream = upstreamInstructions(ctx, o, store, "")
 	}
-	ss, err := newServer(o, store, caller, upstream).Connect(ctx, t, nil)
+	srv := newServer(o, store, caller, upstream)
+	// Added last, so it wraps every other middleware, as limit does the
+	// HTTP handler.
+	srv.AddReceivingMiddleware(limitRequests(o.MaxInFlight, o.MaxInFlightBytes, o.OnRejected, o.OnInFlight))
+	ss, err := srv.Connect(ctx, t, nil)
 	if err != nil {
 		return fmt.Errorf("connect: %w", err)
 	}
@@ -292,10 +299,21 @@ func Serve(ctx context.Context, opts *Options, store *catalog.Store, caller Call
 	}()
 	select {
 	case <-ctx.Done():
-		// Stopping is not a failure. The session is closed but not waited
-		// for: a read from a blocking stdin cannot be interrupted, and would
-		// hold the proxy until the client wrote again.
-		_ = ss.Close()
+		// Stopping is not a failure. Closing the session waits for the
+		// requests running, so it is given the grace and no more; the
+		// session is not waited for either, since a read from a blocking
+		// stdin cannot be interrupted.
+		closed := make(chan struct{})
+		go func() {
+			_ = ss.Close()
+			close(closed)
+		}()
+		timer := time.NewTimer(o.ShutdownGrace)
+		defer timer.Stop()
+		select {
+		case <-closed:
+		case <-timer.C:
+		}
 		return nil
 	case <-waited:
 		if waitErr != nil {

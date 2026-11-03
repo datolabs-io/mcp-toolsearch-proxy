@@ -115,7 +115,7 @@ func options(
 		MaxInstructions: cfg.maxInstructions, SearchSchemas: cfg.searchSchemas, HandshakeWait: cfg.handshakeWait,
 		WriteTools: cfg.writeTools, MaxInFlightBytes: cfg.maxInFlightBytes,
 		MaxBatchCalls: batchCalls(cfg.maxBatchCalls), CallTimeout: cfg.callTimeout,
-		MaxResponseBytes: cfg.maxResponseBytes,
+		MaxResponseBytes: cfg.maxResponseBytes, ShutdownGrace: cfg.shutdownGrace,
 	}
 	return upstreamOpts, storeOpts, opts
 }
@@ -132,7 +132,8 @@ func batchCalls(n int) int {
 // serve serves the proxy over HTTP, or over standard input and output when
 // cfg says so, and metrics on their own address when one is set.
 func serve(ctx context.Context, cfg config, logger *slog.Logger) int {
-	return serveOn(ctx, cfg, logger, &mcp.StdioTransport{})
+	// A frame may be as large as a request over HTTP may.
+	return serveOn(ctx, cfg, logger, &mcp.StdioTransport{MaxLineLength: server.MaxRequestBytes})
 }
 
 // serveOn is serve, speaking MCP on stdio rather than over HTTP when cfg's
