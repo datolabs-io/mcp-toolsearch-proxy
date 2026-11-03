@@ -21,8 +21,8 @@
         {
           "type": "named",
           "name": "-p",
-          "value": "8000:8000",
-          "description": "Publish the proxy's port"
+          "value": "127.0.0.1:8000:8000",
+          "description": "Publish the proxy's port on localhost only: the proxy has no authentication of its own"
         }
       ],
       "environmentVariables": [
