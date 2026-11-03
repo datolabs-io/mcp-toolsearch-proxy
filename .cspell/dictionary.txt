@@ -21,6 +21,7 @@ dtype
 eerr
 errc
 fuzztime
+Glama
 gochecknoglobals
 golangci
 gomod

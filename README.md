@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/datolabs-io/mcp-toolsearch-proxy/actions/workflows/ci.yaml/badge.svg)](https://github.com/datolabs-io/mcp-toolsearch-proxy/actions/workflows/ci.yaml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/datolabs-io/mcp-toolsearch-proxy/badge)](https://scorecard.dev/viewer/?uri=github.com/datolabs-io/mcp-toolsearch-proxy)
+[![Glama](https://glama.ai/mcp/servers/datolabs-io/mcp-toolsearch-proxy/badges/score.svg)](https://glama.ai/mcp/servers/datolabs-io/mcp-toolsearch-proxy)
 
 **mcp-toolsearch-proxy** lets a model use hundreds or thousands of MCP tools without loading them. On 500 tools, each
 request carries 97% fewer tokens of tool definitions, a task costs about half as much, and the model reaches the right
