@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/datolabs-io/mcp-toolsearch-proxy/compare/v0.8.1...v0.9.0) (2026-11-03)
+
+
+### Features
+
+* **server:** serve over stdio ([#12](https://github.com/datolabs-io/mcp-toolsearch-proxy/issues/12)) ([fcef5fc](https://github.com/datolabs-io/mcp-toolsearch-proxy/commit/fcef5fc19e7c04d6ec98f4894f8e9cb854f3e519))
+
 ## [0.8.1](https://github.com/datolabs-io/mcp-toolsearch-proxy/compare/v0.8.0...v0.8.1) (2026-10-31)
 
 
