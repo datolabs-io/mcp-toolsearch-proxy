@@ -95,6 +95,8 @@ dockers_v2:
       org.opencontainers.image.version: "{{ .Version }}"
       org.opencontainers.image.revision: "{{ .FullCommit }}"
       org.opencontainers.image.created: "{{ .Date }}"
+      # The MCP Registry checks it to verify that server.json may name this image.
+      io.modelcontextprotocol.server.name: io.github.datolabs-io/mcp-toolsearch-proxy
 
 homebrew_casks:
   - name: mcp-toolsearch-proxy
