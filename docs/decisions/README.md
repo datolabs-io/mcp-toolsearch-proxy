@@ -13,3 +13,4 @@ rather than rewrite an accepted one.
 | [6](0006-built-in-static-model.md) | A static embedding model, run in process |
 | [7](0007-standalone-proxy.md) | A standalone proxy, not a gateway plugin |
 | [8](0008-several-queries-in-one-search.md) | Several queries in one search |
+| [9](0009-stdio-sends-no-token.md) | Over stdio, upstream requests carry no token |

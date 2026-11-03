@@ -47,6 +47,14 @@ func (l *lockedBuffer) String() string {
 type hostRecorder struct {
 	mu    sync.Mutex
 	hosts []string
+	// auths holds the Authorization header of every request.
+	auths []string
+}
+
+func (h *hostRecorder) authorizations() []string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return slices.Clone(h.auths)
 }
 
 func (h *hostRecorder) seen() []string {
@@ -68,6 +76,7 @@ func (h *hostRecorder) handler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.mu.Lock()
 		h.hosts = append(h.hosts, r.Host)
+		h.auths = append(h.auths, r.Header.Get("Authorization"))
 		h.mu.Unlock()
 		mcpHandler.ServeHTTP(w, r)
 	})
@@ -241,7 +250,8 @@ func TestOptionsCarryEverySetting(t *testing.T) {
 	// The settings options does not take are used by serve and run
 	// themselves. A new setting must be added to one list or the other.
 	elsewhere := []string{
-		"command", "addr", "metricsAddr", "upstream", "embedder", "modelDir", "shutdownGrace", "logLevel", "logFormat",
+		"command", "transport", "addr", "metricsAddr", "upstream", "embedder", "modelDir", "shutdownGrace", "logLevel",
+		"logFormat",
 	}
 	passed := []string{
 		"upstreamHost", "upstreamProtocol", "callTimeout", "listRetries", "listTimeout", "maxResponseBytes",
@@ -291,3 +301,52 @@ func TestNoBatchCallsReachTheServerAsNone(t *testing.T) {
 type embedderStub struct{}
 
 func (embedderStub) Embed(context.Context, []string) ([][]float32, error) { return nil, nil }
+
+// With -transport stdio, the proxy speaks MCP on its standard input and
+// output, which nothing else writes to, and calls the upstream without a
+// credential.
+func TestServeStdio(t *testing.T) {
+	t.Parallel()
+	up := &hostRecorder{}
+	gw := httptest.NewServer(up.handler())
+	t.Cleanup(gw.Close)
+	cfg, err := parseConfig([]string{
+		"-transport", "stdio", "-upstream", gw.URL + "/mcp", "-embedder", "none", "-log-format", "json",
+		"-model-dir", "/m",
+	}, envOf(nil), io.Discard)
+	require.NoError(t, err)
+
+	inR, inW := io.Pipe()
+	outR, outW := io.Pipe()
+	log := &lockedBuffer{}
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan int, 1)
+	go func() {
+		done <- serveOn(ctx, cfg, newLogger(log, slog.LevelInfo, logJSON), &mcp.IOTransport{Reader: inR, Writer: outW})
+	}()
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "test", Version: "0"}, nil)
+	cs, err := client.Connect(t.Context(), &mcp.IOTransport{Reader: outR, Writer: inW}, nil)
+	require.NoError(t, err)
+	tools, err := cs.ListTools(t.Context(), nil)
+	require.NoError(t, err)
+	res, err := cs.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: server.ToolSearch, Arguments: map[string]any{"query": "weather"},
+	})
+	require.NoError(t, err)
+	require.NoError(t, cs.Close())
+	cancel()
+
+	assert.Len(t, tools.Tools, 5)
+	assert.False(t, res.IsError, "%v", res.Content)
+	require.NotEmpty(t, up.authorizations())
+	for _, auth := range up.authorizations() {
+		assert.Empty(t, auth, "a request upstream carried a credential")
+	}
+	select {
+	case code := <-done:
+		assert.Zero(t, code, "%s", log)
+	case <-time.After(10 * time.Second):
+		t.Fatal("serve did not stop")
+	}
+}

@@ -60,6 +60,27 @@ leave `call_write_tool` out, so it keeps asking:
 }
 ```
 
+## Over stdio
+
+Clients that start servers as local commands, such as Claude Desktop or Cursor, can run the proxy itself with
+`-transport stdio`. It then speaks MCP on standard input and output, and logs to standard error.
+
+```json
+{
+  "mcpServers": {
+    "toolsearch": {
+      "command": "mcp-toolsearch-proxy",
+      "args": ["-transport", "stdio", "-upstream", "http://127.0.0.1:9000/mcp", "-embedder", "none"]
+    }
+  }
+}
+```
+
+There is no caller's token over stdio, and the proxy takes none of its own
+([ADR 9](decisions/0009-stdio-sends-no-token.md)), so every request upstream goes without an `Authorization` header.
+That works only with an upstream that needs no authentication, such as a local server with many tools. For one that
+checks tokens, run the proxy over HTTP and connect the client to it with the token, as above.
+
 ## Server instructions are cut by the client
 
 The proxy forwards the upstream's instructions in the handshake, after its own, up to `-max-instructions` characters.

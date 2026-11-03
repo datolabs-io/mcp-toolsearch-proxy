@@ -31,6 +31,7 @@ no secret. `mcp-toolsearch-proxy -h` prints the same list.
 | `-path` | `MCP_PATH` | `/mcp` | MCP endpoint path |
 | `-search-schemas` | `TOOLSEARCH_SEARCH_SCHEMAS` | `3` | how many of the best search matches come with their input schemas; 0 for none |
 | `-shutdown-grace` | `MCP_SHUTDOWN_GRACE` | empty | how long the requests running get to finish when the proxy stops, before their connections are closed; a write cut off may still complete upstream. Empty for -call-timeout plus 15s |
+| `-transport` | `MCP_TRANSPORT` | `http` | http to serve streamable HTTP at -addr and -path, or stdio to speak MCP on standard input and output, where there is no caller's token: upstream requests then carry no Authorization header, so only an upstream that needs none can be served |
 | `-upstream` | `TOOLSEARCH_UPSTREAM` | empty | streamable HTTP URL of the MCP server whose tools are searched, such as a gateway |
 | `-upstream-host` | `TOOLSEARCH_UPSTREAM_HOST` | empty | Host header for upstream requests instead of the URL's, for a gateway reached at an internal address whose servers accept only its public name |
 | `-upstream-protocol` | `TOOLSEARCH_UPSTREAM_PROTOCOL` | `latest` | MCP version to speak upstream, such as 2025-11-25, or latest for the newest supported; an older one helps a gateway whose servers fail the newest handshake |

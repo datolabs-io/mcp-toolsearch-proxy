@@ -16,6 +16,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
 	"github.com/datolabs-io/mcp-toolsearch-proxy/internal/catalog"
 	"github.com/datolabs-io/mcp-toolsearch-proxy/internal/embed"
 	"github.com/datolabs-io/mcp-toolsearch-proxy/internal/metrics"
@@ -127,9 +129,15 @@ func batchCalls(n int) int {
 	return n
 }
 
-// serve serves the proxy over HTTP, and metrics on their own address when
-// one is set.
+// serve serves the proxy over HTTP, or over standard input and output when
+// cfg says so, and metrics on their own address when one is set.
 func serve(ctx context.Context, cfg config, logger *slog.Logger) int {
+	return serveOn(ctx, cfg, logger, &mcp.StdioTransport{})
+}
+
+// serveOn is serve, speaking MCP on stdio rather than over HTTP when cfg's
+// transport is stdio.
+func serveOn(ctx context.Context, cfg config, logger *slog.Logger, stdio mcp.Transport) int {
 	emb, err := loadEmbedder(ctx, cfg, logger)
 	if err != nil {
 		logger.ErrorContext(ctx, "embedder", "err", err)
@@ -163,8 +171,10 @@ func serve(ctx context.Context, cfg config, logger *slog.Logger) int {
 		l, lerr := client.List(ctx, authorization)
 		return catalog.Listing{Tools: l.Tools, Instructions: l.Instructions}, lerr
 	}, storeOpts)
-	// The proxy's server comes last, after the metrics' when there is one.
-	servers = append(servers, server.HTTPServer(cfg.addr, server.ProxyHandler(opts, store, client)))
+	if cfg.transport != transportStdio {
+		// The proxy's server comes last, after the metrics' when there is one.
+		servers = append(servers, server.HTTPServer(cfg.addr, server.ProxyHandler(opts, store, client)))
+	}
 
 	listeners, err := listen(ctx, servers)
 	if err != nil {
@@ -172,16 +182,21 @@ func serve(ctx context.Context, cfg config, logger *slog.Logger) int {
 		return exitFailure
 	}
 	errc := start(servers, listeners)
-	metricsAddr := ""
-	if len(listeners) > 1 {
-		metricsAddr = listeners[0].Addr().String()
-	}
-	logger.InfoContext(ctx, "listening", "addr", listeners[len(listeners)-1].Addr().String(), "path", cfg.path,
-		"metrics", metricsAddr, "upstream", redact(cfg.upstream), "embedder", cfg.embedder)
-
-	select {
-	case err = <-errc:
-	case <-ctx.Done():
+	if cfg.transport == transportStdio {
+		err = serveStdio(ctx, cfg, logger, listeners, errc, func(ctx context.Context) error {
+			return server.Serve(ctx, opts, store, client, stdio)
+		})
+	} else {
+		metricsAddr := ""
+		if len(listeners) > 1 {
+			metricsAddr = listeners[0].Addr().String()
+		}
+		logger.InfoContext(ctx, "listening", "addr", listeners[len(listeners)-1].Addr().String(), "path", cfg.path,
+			"metrics", metricsAddr, "upstream", redact(cfg.upstream), "embedder", cfg.embedder)
+		select {
+		case err = <-errc:
+		case <-ctx.Done():
+		}
 	}
 	// Requests running get the grace to finish: closing their connections
 	// would cancel tool calls upstream, which may still complete there while
@@ -202,6 +217,32 @@ func serve(ctx context.Context, cfg config, logger *slog.Logger) int {
 		return exitFailure
 	}
 	return 0
+}
+
+// serveStdio runs serveMCP, the proxy on standard input and output, until
+// it ends, as when the client closes its input, or ctx is done, or the
+// metrics server, the one in listeners if any, stops.
+func serveStdio(
+	ctx context.Context, cfg config, logger *slog.Logger, listeners []net.Listener, errc <-chan error,
+	serveMCP func(context.Context) error,
+) error {
+	metricsAddr := ""
+	if len(listeners) > 0 {
+		metricsAddr = listeners[0].Addr().String()
+	}
+	logger.InfoContext(ctx, "serving on stdio", "metrics", metricsAddr, "upstream", redact(cfg.upstream),
+		"embedder", cfg.embedder)
+	ctx, stop := context.WithCancel(ctx)
+	defer stop()
+	ended := make(chan error, 1)
+	go func() { ended <- serveMCP(ctx) }()
+	select {
+	case err := <-ended:
+		return err
+	case err := <-errc:
+		stop()
+		return errors.Join(err, <-ended)
+	}
 }
 
 // listen opens a listener for each server's address, in order, so the log

@@ -66,6 +66,14 @@ docker run -d -p 8000:8000 -v toolsearch-model:/model:ro \
 The image listens on `0.0.0.0:8000`, runs as an unprivileged user, and reads the model from `/model`, which a new volume
 inherits ownership of.
 
+For a client that starts the image as a command over stdio, run it with `-i`, without a port, and with
+`MCP_TRANSPORT=stdio`. That mode sends no token upstream ([ADR 9](decisions/0009-stdio-sends-no-token.md)):
+
+```bash
+docker run -i --rm -e MCP_TRANSPORT=stdio -e TOOLSEARCH_UPSTREAM=http://gateway:3000/mcp -e TOOLSEARCH_EMBEDDER=none \
+  ghcr.io/datolabs-io/mcp-toolsearch-proxy
+```
+
 ## Behind a gateway
 
 See [agentgateway.md](agentgateway.md) for a complete setup with agentgateway, and [clients.md](clients.md) for
@@ -95,6 +103,9 @@ mcp-toolsearch-proxy -upstream http://127.0.0.1:9000/mcp -embedder none
 
 Every caller then shares one catalog, the one listed without a token, and anyone who reaches the proxy can call every
 tool. Keep it on loopback (the default `MCP_ADDR`), or put something in front that authenticates clients.
+
+For a client that starts servers as commands, `-transport stdio` runs the proxy on standard input and output instead
+of a port; see [clients.md](clients.md#over-stdio). It sends no token upstream, so it suits only such an upstream.
 
 ## Checking it
 

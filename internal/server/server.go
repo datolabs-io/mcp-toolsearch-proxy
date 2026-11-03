@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -266,6 +267,44 @@ func ProxyHandler(opts *Options, store *catalog.Store, caller Caller) http.Handl
 	return handler(p.server, p.resolve, opts)
 }
 
+// Serve runs the proxy on t, a transport without HTTP such as
+// mcp.StdioTransport, until ctx is done or the client goes away. There is
+// no caller's token on such a transport, and the proxy holds none (ADR 4),
+// so every request upstream goes without an Authorization header: only an
+// upstream that needs no credential serves it (ADR 9). The handshake
+// carries the upstream's instructions after the proxy's own, as
+// ProxyHandler's does, waiting at most opts.HandshakeWait for them.
+func Serve(ctx context.Context, opts *Options, store *catalog.Store, caller Caller, t mcp.Transport) error {
+	o := opts.withDefaults()
+	var upstream string
+	if o.MaxInstructions > 0 {
+		upstream = upstreamInstructions(ctx, o, store, "")
+	}
+	ss, err := newServer(o, store, caller, upstream).Connect(ctx, t, nil)
+	if err != nil {
+		return fmt.Errorf("connect: %w", err)
+	}
+	var waitErr error
+	waited := make(chan struct{})
+	go func() {
+		waitErr = ss.Wait()
+		close(waited)
+	}()
+	select {
+	case <-ctx.Done():
+		// Stopping is not a failure. The session is closed but not waited
+		// for: a read from a blocking stdin cannot be interrupted, and would
+		// hold the proxy until the client wrote again.
+		_ = ss.Close()
+		return nil
+	case <-waited:
+		if waitErr != nil {
+			return fmt.Errorf("session: %w", waitErr)
+		}
+		return nil
+	}
+}
+
 // DefaultHandshakeWait is how long a handshake waits by default for a
 // caller's first catalog: long enough for a gateway's usual list, short
 // against a client's connect timeout.
@@ -355,33 +394,39 @@ func handshake(r *http.Request) (bool, *http.Request) {
 }
 
 // instructions returns the upstream instructions to forward to the caller
-// of r, capped. A kept catalog lends its own at once, up to its max age, since
-// they rarely change. Without one, a build starts and is waited for at
-// most HandshakeWait; it carries on regardless and fills the store, so
-// the caller's next search does not wait for it either.
+// of r, capped (see upstreamInstructions).
 func (p *perCaller) instructions(r *http.Request) string {
-	auth := r.Header.Get("Authorization")
-	if c, ok := p.store.Cached(auth); ok {
-		return capInstructions(c.Instructions(), p.o.MaxInstructions)
+	return upstreamInstructions(r.Context(), p.o, p.store, r.Header.Get("Authorization"))
+}
+
+// upstreamInstructions returns the upstream instructions to forward to the
+// caller whose Authorization header value is auth, capped. A kept catalog
+// lends its own at once, up to its max age, since they rarely change.
+// Without one, a build starts and is waited for at most o.HandshakeWait; it
+// carries on regardless and fills the store, so the caller's next search
+// does not wait for it either.
+func upstreamInstructions(ctx context.Context, o Options, store *catalog.Store, auth string) string {
+	if c, ok := store.Cached(auth); ok {
+		return capInstructions(c.Instructions(), o.MaxInstructions)
 	}
 	built := make(chan *catalog.Catalog, 1)
 	go func() {
-		if c, err := p.store.Get(context.WithoutCancel(r.Context()), auth, false); err == nil {
+		if c, err := store.Get(context.WithoutCancel(ctx), auth, false); err == nil {
 			built <- c
 		}
 		close(built)
 	}()
-	timer := time.NewTimer(p.o.HandshakeWait)
+	timer := time.NewTimer(o.HandshakeWait)
 	defer timer.Stop()
 	select {
 	case c, ok := <-built:
 		if ok {
-			return capInstructions(c.Instructions(), p.o.MaxInstructions)
+			return capInstructions(c.Instructions(), o.MaxInstructions)
 		}
 	case <-timer.C:
-	case <-r.Context().Done():
+	case <-ctx.Done():
 	}
-	p.o.OnMissedInstructions()
+	o.OnMissedInstructions()
 	return ""
 }
 

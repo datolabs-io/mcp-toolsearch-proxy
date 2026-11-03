@@ -171,6 +171,11 @@ about 100 s for any byte. A call may take up to `-call-timeout`, and a single JS
 `/healthz` answers a liveness probe without contacting the upstream. Requests from browser pages are refused unless
 their origin is listed, and off loopback the `Host` header is checked against a list when one is given.
 
+`-transport stdio` serves the same server on standard input and output instead, for clients that start servers as
+commands. The handshake carries the upstream's instructions as over HTTP. There is no caller's token there and the
+proxy takes none (ADR 9), so every request upstream goes without `Authorization`, and only an upstream that needs no
+credential can be served. Logs go to standard error, as always; `-metrics-addr` still serves metrics over HTTP.
+
 ## Configuration
 
 Flags, each with an environment variable as its default; a flag on the command line wins. The proxy takes no secret
