@@ -22,9 +22,10 @@ to the user's own instructions. Behind a gateway, that text comes from every ser
 them can put instruction-grade text in front of every user of the proxy. Trust each upstream server's instructions as
 you trust its tools, or set `-max-instructions 0` to forward none.
 
-`call_read_tool` trusts each upstream tool's `readOnlyHint`. A server that marks a write as read-only gets it called
-without the client asking; `-write-tools` names tools to treat as writes regardless (see
-[docs/clients.md](docs/clients.md)).
+The call tools trust each upstream tool's annotations. A server that marks a write as read-only gets it called through
+`call_read_tool`, and one that marks a destructive write `destructiveHint: false` gets it called through
+`call_write_tool`, without the client asking if the client allows those; `-write-tools` names tools to treat as
+destructive regardless (see [docs/clients.md](docs/clients.md)).
 
 ## Response time
 

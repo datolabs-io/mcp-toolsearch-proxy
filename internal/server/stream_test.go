@@ -199,7 +199,7 @@ func readUntil(t *testing.T, r *bufio.Reader, want string) string {
 
 // holdCall is a tools/call of the gate's tool that holds until let go.
 const holdCall = `{"jsonrpc":"2.0","id":2,"method":"tools/call",` +
-	`"params":{"name":"call_write_tool","arguments":{"name":"hold"}}}`
+	`"params":{"name":"call_destructive_tool","arguments":{"name":"hold"}}}`
 
 // A call that waits on the upstream is answered as a stream of server-sent
 // events: the headers and comments while it waits, as they are sent, then

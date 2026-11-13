@@ -338,7 +338,7 @@ func TestServeStdio(t *testing.T) {
 	require.NoError(t, cs.Close())
 	cancel()
 
-	assert.Len(t, tools.Tools, 5)
+	assert.Len(t, tools.Tools, 6)
 	assert.False(t, res.IsError, "%v", res.Content)
 	require.NotEmpty(t, up.authorizations())
 	for _, auth := range up.authorizations() {

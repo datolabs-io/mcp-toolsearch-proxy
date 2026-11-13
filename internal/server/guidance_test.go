@@ -26,7 +26,7 @@ func TestGuidanceTakesSchemasFromSearch(t *testing.T) {
 	assert.NotContains(t, instructions, "call describe_tool with the names you picked")
 	assert.Contains(t, instructions, "describe_tool only for a tool returned without one")
 	for _, tl := range res.Tools {
-		if tl.Name == server.ToolCallRead || tl.Name == server.ToolCallWrite {
+		if tl.Name == server.ToolCallRead || tl.Name == server.ToolCallDestructive {
 			assert.Contains(t, tl.Description, "the input schema from search_tools or describe_tool", tl.Name)
 		}
 	}
@@ -75,7 +75,7 @@ func TestWriteToolsAreNeverCalledAsReads(t *testing.T) {
 	read := call(t, cs, server.ToolCallRead, map[string]any{
 		"name": "weather_get_forecast", "arguments": map[string]any{"place": "Vilnius"},
 	})
-	write := call(t, cs, server.ToolCallWrite, map[string]any{
+	write := call(t, cs, server.ToolCallDestructive, map[string]any{
 		"name": "weather_get_forecast", "arguments": map[string]any{"place": "Vilnius"},
 	})
 	alerts := call(t, cs, server.ToolCallRead, map[string]any{"name": "weather_get_alerts"})
@@ -89,7 +89,7 @@ func TestWriteToolsAreNeverCalledAsReads(t *testing.T) {
 	require.Len(t, described.Tools, 1)
 	assert.False(t, described.Tools[0].Annotations.ReadOnlyHint)
 	assert.True(t, read.IsError)
-	assert.Contains(t, text(read), server.ToolCallWrite)
+	assert.Contains(t, text(read), server.ToolCallDestructive)
 	assert.False(t, write.IsError, text(write))
 	assert.False(t, alerts.IsError, text(alerts))
 }

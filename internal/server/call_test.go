@@ -136,7 +136,7 @@ func TestCallForwardsArgumentsByteForByte(t *testing.T) {
 	r := &recording{listed: []*mcp.Tool{tool("records_delete", nil)}}
 	cs, _ := callFixture(t, r, nil, nil)
 
-	res := rawCall(t, cs, server.ToolCallWrite,
+	res := rawCall(t, cs, server.ToolCallDestructive,
 		`{"name":"records_delete","arguments":{"id":1234567890123456789,"ratio":1.10,`+
 			`"a":{"id":1},"b":[{"id":1},{"id":2}],"c":[]}}`)
 
@@ -180,7 +180,7 @@ func TestCallRefusesAmbiguousInput(t *testing.T) {
 		`{"name":1}`,
 		`["a_read"]`,
 	} {
-		for _, tl := range []string{server.ToolCallRead, server.ToolCallWrite} {
+		for _, tl := range []string{server.ToolCallRead, server.ToolCallDestructive} {
 			res := rawCall(t, cs, tl, raw)
 			assert.True(t, res.IsError, "%s %s", tl, raw)
 		}
@@ -201,7 +201,7 @@ func TestCallReadRefusesARepeatedName(t *testing.T) {
 		res := rawCall(t, cs, server.ToolCallRead, `{"name":"dup"}`)
 
 		assert.True(t, res.IsError, text(res))
-		assert.Contains(t, text(res), server.ToolCallWrite)
+		assert.Contains(t, text(res), server.ToolCallDestructive)
 		assert.Zero(t, r.calls.Load())
 		out := structured[server.SearchOut](t, call(t, cs, server.ToolSearch, map[string]any{"query": "dup"}))
 		require.Len(t, out.Tools, 1, "search shows the name once")
@@ -245,7 +245,7 @@ func TestCallSaysTheUpstreamAnswered(t *testing.T) {
 	r := &recording{listed: []*mcp.Tool{tool("broken", nil)}}
 	cs, _ := callFixture(t, r, nil, nil)
 
-	res := rawCall(t, cs, server.ToolCallWrite, `{"name":"broken"}`)
+	res := rawCall(t, cs, server.ToolCallDestructive, `{"name":"broken"}`)
 
 	assert.True(t, res.IsError)
 	assert.True(t, strings.HasPrefix(text(res), "the upstream returned an error: no such record"), text(res))
@@ -257,7 +257,7 @@ func TestCallWriteWithoutAResultMayHaveRun(t *testing.T) {
 	r := &recording{listed: []*mcp.Tool{tool("hang", nil)}}
 	cs, logs := callFixture(t, r, nil, &upstream.Options{CallTimeout: 200 * time.Millisecond})
 
-	res := rawCall(t, cs, server.ToolCallWrite, `{"name":"hang","arguments":{"x":"`+secret+`"}}`)
+	res := rawCall(t, cs, server.ToolCallDestructive, `{"name":"hang","arguments":{"x":"`+secret+`"}}`)
 
 	assert.True(t, res.IsError)
 	assert.Contains(t, text(res), "no result arrived (timeout)")
@@ -282,7 +282,7 @@ func TestCallToAnUnreachableUpstreamKeepsItsAddressOut(t *testing.T) {
 	t.Cleanup(ts.Close)
 	cs := connect(t, ts.URL+"/mcp")
 
-	res := rawCall(t, cs, server.ToolCallWrite, `{"name":"records_delete"}`)
+	res := rawCall(t, cs, server.ToolCallDestructive, `{"name":"records_delete"}`)
 
 	assert.True(t, res.IsError)
 	assert.Contains(t, text(res), "refused")
@@ -305,7 +305,7 @@ func TestFailedCatalogKeepsTheUpstreamAddressOut(t *testing.T) {
 	for _, res := range []*mcp.CallToolResult{
 		call(t, cs, server.ToolSearch, map[string]any{"query": "weather"}),
 		call(t, cs, server.ToolDescribe, map[string]any{"names": []string{"x"}}),
-		rawCall(t, cs, server.ToolCallWrite, `{"name":"x"}`),
+		rawCall(t, cs, server.ToolCallDestructive, `{"name":"x"}`),
 	} {
 		assert.True(t, res.IsError)
 		assert.Contains(t, text(res), "could not be loaded")
@@ -319,7 +319,7 @@ func TestCallOverTheResponseLimitFailsClearly(t *testing.T) {
 	r := &recording{listed: []*mcp.Tool{tool("big", &mcp.ToolAnnotations{ReadOnlyHint: true})}}
 	cs, logs := callFixture(t, r, nil, &upstream.Options{MaxResponseBytes: 2 << 10})
 
-	write := rawCall(t, cs, server.ToolCallWrite, `{"name":"big"}`)
+	write := rawCall(t, cs, server.ToolCallDestructive, `{"name":"big"}`)
 	read := rawCall(t, cs, server.ToolCallRead, `{"name":"big"}`)
 
 	for _, res := range []*mcp.CallToolResult{write, read} {

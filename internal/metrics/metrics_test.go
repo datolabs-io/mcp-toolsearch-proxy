@@ -147,7 +147,7 @@ func TestMiddlewareCountsToolCalls(t *testing.T) {
 
 	for _, p := range []*mcp.CallToolParams{
 		{Name: server.ToolSearch, Arguments: map[string]any{"query": "echo"}},
-		{Name: server.ToolCallWrite, Arguments: map[string]any{"name": "nope"}},
+		{Name: server.ToolCallDestructive, Arguments: map[string]any{"name": "nope"}},
 		{Name: "made_up"},
 	} {
 		_, _ = cs.CallTool(t.Context(), p)
@@ -155,7 +155,7 @@ func TestMiddlewareCountsToolCalls(t *testing.T) {
 
 	out := scrape(t, m)
 	assert.Contains(t, out, `mcp_toolsearch_tool_calls_total{outcome="ok",tool="search_tools"} 1`)
-	assert.Contains(t, out, `mcp_toolsearch_tool_calls_total{outcome="tool_error",tool="call_write_tool"} 1`)
+	assert.Contains(t, out, `mcp_toolsearch_tool_calls_total{outcome="tool_error",tool="call_destructive_tool"} 1`)
 	assert.Contains(t, out, `tool="unknown"`)
 	assert.NotContains(t, out, "made_up")
 	assert.Contains(t, out, `mcp_toolsearch_searches_total{mode="lexical"} 1`)

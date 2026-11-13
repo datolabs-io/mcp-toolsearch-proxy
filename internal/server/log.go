@@ -22,12 +22,18 @@ const (
 	// arguments do not fit the tool's input schema, so the upstream was
 	// not called.
 	OutcomeInvalidArguments = "invalid_arguments"
-	OutcomeError            = "error"
+	// OutcomeWrongTool is a call the proxy refused because the upstream
+	// tool may do more than the call tool used allows, such as a tool that
+	// may delete called with call_write_tool, so the upstream was not
+	// called.
+	OutcomeWrongTool = "wrong_tool"
+	OutcomeError     = "error"
 )
 
 // Outcome classifies what a tool call returned: a result, a result that
 // reports the tool failed, a result that reports the upstream failed, a
-// call refused for its arguments, or no result. ctx is the call's, as a
+// call refused for its arguments or for the call tool it used, or no
+// result. ctx is the call's, as a
 // middleware of the server receives it; only then can the upstream's
 // failures be told from the tool's, or a refusal.
 func Outcome(ctx context.Context, res mcp.Result, err error) string {
@@ -44,6 +50,8 @@ func Outcome(ctx context.Context, res mcp.Result, err error) string {
 		return OutcomeUpstreamError
 	case tracked && s.invalid.Load():
 		return OutcomeInvalidArguments
+	case tracked && s.wrong.Load():
+		return OutcomeWrongTool
 	default:
 		return OutcomeToolError
 	}
@@ -58,6 +66,8 @@ type callState struct {
 	upstream atomic.Bool
 	// invalid is set when the call was refused for its arguments.
 	invalid atomic.Bool
+	// wrong is set when the call was refused for the call tool it used.
+	wrong atomic.Bool
 }
 
 // trackCalls gives every tool call a *callState, outside every other
@@ -87,6 +97,14 @@ func invalidArguments(ctx context.Context) {
 	}
 }
 
+// wrongTool notes that the call of ctx was refused for the call tool it
+// used.
+func wrongTool(ctx context.Context) {
+	if s, ok := ctx.Value(callKey{}).(*callState); ok {
+		s.wrong.Store(true)
+	}
+}
+
 // logFailures logs one line for each tool call that fails: the tool, for
 // the call tools the upstream tool they named, the outcome and how long it took,
 // never the query, the arguments, the result or the error text, which may
@@ -105,7 +123,8 @@ func logFailures(logger *slog.Logger) mcp.Middleware {
 				return res, err
 			}
 			attrs := []any{"tool", ToolName(call.Params.Name), "outcome", outcome}
-			if call.Params.Name == ToolCallRead || call.Params.Name == ToolCallWrite {
+			if call.Params.Name == ToolCallRead || call.Params.Name == ToolCallWrite ||
+				call.Params.Name == ToolCallDestructive {
 				attrs = append(attrs, "target", target(call.Params.Arguments))
 			}
 			attrs = append(attrs, "took", time.Since(start).Round(time.Millisecond))
@@ -123,7 +142,7 @@ const Unknown = "unknown"
 // otherwise.
 func ToolName(name string) string {
 	switch name {
-	case ToolSearch, ToolDescribe, ToolCallRead, ToolCallReads, ToolCallWrite:
+	case ToolSearch, ToolDescribe, ToolCallRead, ToolCallReads, ToolCallWrite, ToolCallDestructive:
 		return name
 	default:
 		return Unknown

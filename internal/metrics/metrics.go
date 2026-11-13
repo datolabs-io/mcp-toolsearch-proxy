@@ -104,7 +104,8 @@ func New(opts *Options) *Metrics {
 			Name: "mcp_toolsearch_tool_calls_total",
 			Help: "Tool calls by tool and outcome: ok, tool_error, upstream_error when the upstream failed " +
 				"rather than the tool, invalid_arguments when the proxy refused arguments that do not fit the " +
-				"tool's input schema, or error.",
+				"tool's input schema, wrong_tool when it refused a tool that may do more than the call tool " +
+				"used allows, or error.",
 		}, []string{labelTool, labelOutcome}),
 		duration: prometheus.NewHistogramVec(prometheus.HistogramOpts{
 			Name: "mcp_toolsearch_tool_call_duration_seconds", Help: "How long tool calls take, by tool.",

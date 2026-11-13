@@ -39,7 +39,8 @@ const instructions = "This server gives access to a large catalog of tools throu
 	"Call search_tools with what you want to do, in any language, to find candidate tools; " +
 	"it returns the input schemas of the best matches, so call describe_tool only for a tool returned without one; " +
 	"then call a tool by name with its arguments: call_read_tool for tools marked readOnly " +
-	"(call_read_tools for several at once), call_write_tool for any other. " +
+	"(call_read_tools for several at once), call_write_tool for tools that only add (neither readOnly nor " +
+	"destructive), call_destructive_tool for any other. " +
 	"Wrong arguments come back with the schema: fix them and call again. " +
 	"Search again with other words when nothing fits: the catalog is larger than any one search shows."
 

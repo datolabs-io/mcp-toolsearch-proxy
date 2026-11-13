@@ -37,8 +37,11 @@ several queries:
 | 1,000 | 112,975 (273.4 KB) | 643 | 1,735 (4.0 KB) | 523 (1.4 KB) |
 | 1,490 | 168,322 (407.3 KB) | 643 | 1,735 (4.0 KB) | 521 (1.4 KB) |
 
+The table predates `call_destructive_tool` and the annotation fields of `search_tools`, which bring `proxy` from 4.0 KB
+to 4.8 KB.
+
 Neither the proxy nor Anthropic's tool search costs more as the catalog grows. Tool search starts smaller: its
-search tool alone is loaded, where the proxy has five tools and a page of guidance. What each adds per search, and in
+search tool alone is loaded, where the proxy has six tools and a page of guidance. What each adds per search, and in
 how many turns a model gets to the right tool, is what the agent benchmark below measures.
 
 ## How a model does with each

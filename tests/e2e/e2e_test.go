@@ -139,7 +139,7 @@ func TestTheGatewayRefusesCallersWithoutAToken(t *testing.T) {
 	}
 }
 
-func TestTheProxyOffersFiveTools(t *testing.T) {
+func TestTheProxyOffersSixTools(t *testing.T) {
 	t.Parallel()
 
 	res, err := connect(t, env(t, "E2E_SEARCH_URL"), token(t, "alice")).ListTools(t.Context(), nil)
@@ -147,7 +147,10 @@ func TestTheProxyOffersFiveTools(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(
 		t,
-		[]string{"call_read_tool", "call_read_tools", "call_write_tool", "describe_tool", "search_tools"},
+		[]string{
+			"call_destructive_tool", "call_read_tool", "call_read_tools", "call_write_tool", "describe_tool",
+			"search_tools",
+		},
 		names(res.Tools),
 	)
 }
@@ -291,7 +294,7 @@ func TestCallRefusesToolsTheGatewayWithholds(t *testing.T) {
 	cs := connect(t, env(t, "E2E_SEARCH_URL"), token(t, "bob"))
 
 	res, err := cs.CallTool(t.Context(), &mcp.CallToolParams{
-		Name: "call_write_tool", Arguments: map[string]any{"name": "admin_delete_user"},
+		Name: "call_destructive_tool", Arguments: map[string]any{"name": "admin_delete_user"},
 	})
 
 	require.NoError(t, err)
@@ -307,6 +310,23 @@ func TestCallReadRefusesWrites(t *testing.T) {
 
 	res, err := cs.CallTool(t.Context(), &mcp.CallToolParams{
 		Name: "call_read_tool", Arguments: map[string]any{"name": "admin_delete_user"},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, res.IsError)
+	assert.Equal(t, before["delete_user"], adminCalls(t, cs)["delete_user"], "the tool never ran")
+}
+
+// Adding is no way to destroy: call_write_tool refuses a tool the upstream
+// does not mark as one that only adds (destructiveHint false), even for a
+// caller allowed to call it.
+func TestCallWriteRefusesToolsThatMayDestroy(t *testing.T) {
+	t.Parallel()
+	cs := connect(t, env(t, "E2E_SEARCH_URL"), token(t, "alice"))
+	before := adminCalls(t, cs)
+
+	res, err := cs.CallTool(t.Context(), &mcp.CallToolParams{
+		Name: "call_write_tool", Arguments: map[string]any{"name": "admin_delete_user"},
 	})
 
 	require.NoError(t, err)

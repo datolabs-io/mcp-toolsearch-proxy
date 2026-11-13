@@ -77,7 +77,7 @@ func TestFailuresOfTheUpstreamAreNotToolErrors(t *testing.T) {
 	for _, p := range []struct{ tool, raw string }{
 		{server.ToolSearch, `{"query":"weather"}`},
 		{server.ToolDescribe, `{"names":["x"]}`},
-		{server.ToolCallWrite, `{"name":"x"}`},
+		{server.ToolCallDestructive, `{"name":"x"}`},
 	} {
 		res := rawCall(t, cs, p.tool, p.raw)
 		require.True(t, res.IsError)
@@ -94,10 +94,10 @@ func TestCallOutcomes(t *testing.T) {
 		{raw: `{"name":"fine"}`, want: server.OutcomeOK},
 		{raw: `{"name":"broken"}`, want: server.OutcomeUpstreamError},
 		{raw: `{"name":"hang"}`, want: server.OutcomeUpstreamError},
-		{raw: `{"name":"fine"}`, read: "read", want: server.OutcomeToolError},
+		{raw: `{"name":"fine"}`, read: "read", want: server.OutcomeWrongTool},
 		{raw: `{"name":"fine","extra":1}`, want: server.OutcomeToolError},
 	} {
-		name := server.ToolCallWrite
+		name := server.ToolCallDestructive
 		if tc.read != "" {
 			name = server.ToolCallRead
 		}
