@@ -2,7 +2,7 @@
 idiomatic_version_file_enable_tools = []
 
 [tools]
-go = "1.27.3"
+go = "1.27.4"
 golangci-lint = "2.15.0"
 gitleaks = "8.30.1"
 pre-commit = "4.7.0"
