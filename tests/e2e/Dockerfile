@@ -1,7 +1,7 @@
 # Images for the end-to-end tests, built from the working tree: the proxy,
 # and the fixture MCP servers. Releases are built by GoReleaser instead (see
 # the Dockerfile at the root).
-FROM golang:1.27.3-trixie@sha256:c65ecfe613b539ac74c62a4c3b2c27e8f8a6076384c8f27e8a3c0f3be17cc385 AS build
+FROM golang:1.27.4-trixie@sha256:b54b2639de8c1bfe538ec5ffc45f29b1932235ac5f6d63c059853646677112d9 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 COPY vendor vendor
