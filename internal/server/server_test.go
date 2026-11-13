@@ -234,7 +234,7 @@ func text(res *mcp.CallToolResult) string {
 	return b.String()
 }
 
-func TestOffersFiveTools(t *testing.T) {
+func TestOffersSixTools(t *testing.T) {
 	t.Parallel()
 	cs := connect(t, proxy(t).url)
 
@@ -253,6 +253,7 @@ func TestOffersFiveTools(t *testing.T) {
 			server.ToolCallRead,
 			server.ToolCallReads,
 			server.ToolCallWrite,
+			server.ToolCallDestructive,
 		},
 		names,
 	)
@@ -364,7 +365,7 @@ func TestCallRefusesToolsTheCallerMayNotUse(t *testing.T) {
 	t.Parallel()
 	cs := connectWith(t, proxy(t).url, "Bearer bob")
 
-	res := call(t, cs, server.ToolCallWrite, map[string]any{"name": "users_delete"})
+	res := call(t, cs, server.ToolCallDestructive, map[string]any{"name": "users_delete"})
 
 	assert.True(t, res.IsError)
 	assert.Contains(t, text(res), "no tool")
@@ -387,7 +388,7 @@ func TestCallFindsToolsAddedSinceTheCatalogWasBuilt(t *testing.T) {
 	structured[server.SearchOut](t, call(t, cs, server.ToolSearch, map[string]any{"query": "weather"}))
 	f.gw.add("weather_get_radar")
 
-	res := call(t, cs, server.ToolCallWrite, map[string]any{"name": "weather_get_radar"})
+	res := call(t, cs, server.ToolCallDestructive, map[string]any{"name": "weather_get_radar"})
 
 	assert.False(t, res.IsError, text(res))
 }
@@ -446,7 +447,12 @@ func TestTheLogHoldsNoQueryArgumentsResultOrToken(t *testing.T) {
 		server.ToolCallRead,
 		map[string]any{"name": "weather_get_forecast", "arguments": map[string]any{"days": secret}},
 	)
-	call(t, cs, server.ToolCallWrite, map[string]any{"name": "missing_tool", "arguments": map[string]any{"x": secret}})
+	call(
+		t,
+		cs,
+		server.ToolCallDestructive,
+		map[string]any{"name": "missing_tool", "arguments": map[string]any{"x": secret}},
+	)
 	_, _ = cs.CallTool(t.Context(), &mcp.CallToolParams{Name: "made_up_" + secret})
 
 	log := f.log()
@@ -463,7 +469,7 @@ func TestCallToolSchemaTakesAnObject(t *testing.T) {
 
 	require.NoError(t, err)
 	for _, tl := range res.Tools {
-		if tl.Name != server.ToolCallRead && tl.Name != server.ToolCallWrite {
+		if tl.Name != server.ToolCallRead && tl.Name != server.ToolCallDestructive {
 			continue
 		}
 		raw, merr := json.Marshal(tl.InputSchema)
@@ -615,9 +621,9 @@ func TestCallReadRefusesToolsThatMayChangeThings(t *testing.T) {
 	res := call(t, cs, server.ToolCallRead, map[string]any{"name": "users_delete"})
 
 	assert.True(t, res.IsError)
-	assert.Contains(t, text(res), server.ToolCallWrite)
+	assert.Contains(t, text(res), server.ToolCallDestructive)
 	assert.Zero(t, f.gw.called("users_delete"), "the tool never ran")
-	call(t, cs, server.ToolCallWrite, map[string]any{"name": "users_delete"})
+	call(t, cs, server.ToolCallDestructive, map[string]any{"name": "users_delete"})
 	assert.Equal(t, 1, f.gw.called("users_delete"), "calls are counted")
 }
 
@@ -636,8 +642,8 @@ func TestCallWriteCallsAnyTool(t *testing.T) {
 	t.Parallel()
 	cs := connectWith(t, proxy(t).url, "Bearer alice")
 
-	deleted := call(t, cs, server.ToolCallWrite, map[string]any{"name": "users_delete"})
-	read := call(t, cs, server.ToolCallWrite, map[string]any{"name": "weather_get_alerts"})
+	deleted := call(t, cs, server.ToolCallDestructive, map[string]any{"name": "users_delete"})
+	read := call(t, cs, server.ToolCallDestructive, map[string]any{"name": "weather_get_alerts"})
 
 	assert.False(t, deleted.IsError, text(deleted))
 	assert.Equal(t, "deleted", text(deleted))
@@ -656,11 +662,11 @@ func TestCallToolsAreAnnotatedForClientPermissions(t *testing.T) {
 		byName[tl.Name] = tl
 	}
 	require.Contains(t, byName, server.ToolCallRead)
-	require.Contains(t, byName, server.ToolCallWrite)
+	require.Contains(t, byName, server.ToolCallDestructive)
 	assert.True(t, byName[server.ToolCallRead].Annotations.ReadOnlyHint, "clients may let reads run unasked")
-	assert.False(t, byName[server.ToolCallWrite].Annotations.ReadOnlyHint)
-	require.NotNil(t, byName[server.ToolCallWrite].Annotations.DestructiveHint)
-	assert.True(t, *byName[server.ToolCallWrite].Annotations.DestructiveHint)
+	assert.False(t, byName[server.ToolCallDestructive].Annotations.ReadOnlyHint)
+	require.NotNil(t, byName[server.ToolCallDestructive].Annotations.DestructiveHint)
+	assert.True(t, *byName[server.ToolCallDestructive].Annotations.DestructiveHint)
 }
 
 func TestSearchSaysWhichToolsOnlyRead(t *testing.T) {
@@ -906,7 +912,7 @@ func TestLongQueriesAndNamesAreRefused(t *testing.T) {
 	search := call(t, cs, server.ToolSearch, map[string]any{"query": long})
 	describe := call(t, cs, server.ToolDescribe, map[string]any{"names": []string{"weather_get_forecast", name}})
 	read := call(t, cs, server.ToolCallRead, map[string]any{"name": name})
-	write := call(t, cs, server.ToolCallWrite, map[string]any{"name": name})
+	write := call(t, cs, server.ToolCallDestructive, map[string]any{"name": name})
 	atLimit := call(t, cs, server.ToolSearch, map[string]any{"query": strings.Repeat("ą", 1000)})
 
 	assert.True(t, search.IsError)

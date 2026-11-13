@@ -84,7 +84,7 @@ func (t *tools) callReads(ctx context.Context, req *mcp.CallToolRequest) (*mcp.C
 				results[i], outcomes[i] = late, OutcomeUpstreamError
 				return
 			}
-			res, outcome := t.callOne(ctx, req, c, in, true)
+			res, outcome := t.callOne(ctx, req, c, in, classRead)
 			// Results past the budget are dropped as they come, so that a
 			// batch holds no more than one response's worth. The slot is held
 			// until then, so that no more than batchParallel results are
@@ -109,7 +109,7 @@ func (t *tools) batchResult(
 ) *mcp.CallToolResult {
 	out := &mcp.CallToolResult{IsError: true}
 	var structured []any
-	anyStructured, invalid := false, true
+	anyStructured, invalid, wrong := false, true, true
 	for i, res := range results {
 		status := "ok"
 		if res.IsError {
@@ -120,6 +120,7 @@ func (t *tools) batchResult(
 			out.IsError = false
 		}
 		invalid = invalid && outcomes[i] == OutcomeInvalidArguments
+		wrong = wrong && outcomes[i] == OutcomeWrongTool
 		out.Content = append(out.Content, &mcp.TextContent{
 			Text: fmt.Sprintf("[%d/%d] %s: %s", i+1, len(results), truncate(calls[i].Name), status),
 		})
@@ -131,8 +132,11 @@ func (t *tools) batchResult(
 		// Structured content is an object, so the list goes in one.
 		out.StructuredContent = map[string]any{"results": structured}
 	}
-	if out.IsError && invalid {
+	switch {
+	case out.IsError && invalid:
 		invalidArguments(ctx)
+	case out.IsError && wrong:
+		wrongTool(ctx)
 	}
 	return out
 }

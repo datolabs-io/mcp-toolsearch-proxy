@@ -20,8 +20,9 @@ TOOLSEARCH_UPSTREAM=
 # How many read-only calls call_read_tools takes in one request, up to 50;
 # 0 leaves the tool out.
 # TOOLSEARCH_MAX_BATCH_CALLS=10
-# Upstream tools always treated as writes, whatever the upstream marks them:
-# comma-separated names or patterns. call_read_tool refuses them.
+# Upstream tools always treated as writes that may delete or overwrite,
+# whatever the upstream marks them: comma-separated names or patterns. Only
+# call_destructive_tool calls them.
 # TOOLSEARCH_WRITE_TOOLS=github_*,mail_send
 # builtin needs the model: run `mcp-toolsearch-proxy fetch-model` as the
 # service user once, with runuser (see /usr/share/doc/mcp-toolsearch-proxy/deploy.md), or
@@ -31,8 +32,8 @@ TOOLSEARCH_UPSTREAM=
 # How long a caller's catalog is used before the tools are listed again. An
 # older one stays in use while they are listed again in the background, and
 # while that fails, up to the max age (0 for six times the TTL). The
-# read-only check of call_read_tool reads this catalog, so it may lag the
-# upstream's readOnlyHint by up to the max age.
+# annotation checks of the call tools read this catalog, so they may lag the
+# upstream's annotations by up to the max age.
 # TOOLSEARCH_CATALOG_TTL=10m
 # TOOLSEARCH_CATALOG_MAX_AGE=0
 # How many callers' catalogs are kept; each takes several MB, and every new

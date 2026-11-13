@@ -8,7 +8,7 @@
 request carries 97% fewer tokens of tool definitions, a task costs about half as much, and the model reaches the right
 tool nearly as often as with every tool loaded ([benchmarks](docs/benchmarks.md)).
 
-It is an [MCP](https://modelcontextprotocol.io) server that puts five tools in front of an MCP server with far too many
+It is an [MCP](https://modelcontextprotocol.io) server that puts six tools in front of an MCP server with far too many
 to list to a model, such as a gateway that aggregates dozens of servers:
 
 | Tool | Does |
@@ -17,22 +17,30 @@ to list to a model, such as a gateway that aggregates dozens of servers:
 | `describe_tool` | returns the full description and input schema of up to 10 tools |
 | `call_read_tool` | calls a tool the upstream marks read-only, and refuses any other |
 | `call_read_tools` | calls up to 10 read-only tools at once, in parallel, with a result for each (`-max-batch-calls`; 0 leaves it out) |
-| `call_write_tool` | calls any tool, for those that may create, change or delete something |
+| `call_write_tool` | calls a tool the upstream marks as one that only adds (`destructiveHint: false`), and refuses any that may delete or overwrite |
+| `call_destructive_tool` | calls any tool, for those that may delete or overwrite something, or whose server does not say |
 
 A catalog of a thousand tools costs a model over 100,000 tokens of tool definitions before it does anything, and many
-clients cap how many tools they load anyway. Behind the proxy, the model sees five, in 1,735 tokens.
+clients cap how many tools they load anyway. Behind the proxy, the model sees six, in about 2,000 tokens.
 
 A call whose arguments do not fit the tool's input schema (a required property missing, a wrong type, a value outside
 an enum) is refused before it reaches the upstream, with what is wrong and the schema, so the model can fix it at once.
 The same goes for an unknown name that is clearly a typo of one tool, and for an upstream that answers invalid params.
 
-Calls come in separate tools so that a client can tell them apart: `call_read_tool` and `call_read_tools` are marked
-read-only and can be allowed to run without asking, while `call_write_tool` is marked destructive and can keep asking
-every time. Writes are never batched, so each keeps its own approval. A tool counts as
-read-only only when the upstream server marks it so (`readOnlyHint`); unmarked tools are writes, and so are any the
-operator lists in `-write-tools`. Allowing `call_read_tool` allows every read-only tool of every server behind the
-upstream, including servers added later; [docs/clients.md](docs/clients.md) says what that grant covers and how to set
-up claude.ai and Claude Code.
+Calls come in separate tools by what the upstream tool may do, so that a client can tell them apart and ask for each
+its own way. `call_read_tool` and `call_read_tools` are marked read-only and can be allowed to run without asking.
+`call_write_tool` is marked as a write that destroys nothing and may be allowed too, or keep asking. `call_destructive_tool`
+is marked destructive and can keep asking every time. Writes are never batched, so each keeps its own approval.
+
+The proxy reads all four of the upstream's tool annotations, with the spec's defaults for any a server leaves out. A
+tool is a read only when marked `readOnlyHint`, and a write that only adds only when also marked `destructiveHint:
+false`, since the spec's default is `true`; anything else, unmarked tools included, is destructive, and so are any the
+operator lists in `-write-tools`. `search_tools` and `describe_tool` show each tool's `readOnly`, `destructive`,
+`idempotent` and `openWorld`, and a write that got no result says whether its server marks it idempotent, so whether
+calling it again is safe on that server's word. The annotations choose the call tool, and with it the client's
+approval; they are the upstream's word, not a security boundary. Allowing `call_read_tool` allows every read-only tool
+of every server behind the upstream, including servers added later; [docs/clients.md](docs/clients.md) says what each
+grant covers and how to set up claude.ai and Claude Code.
 
 ```text
 client ──▶ gateway /mcp/search ──▶ mcp-toolsearch-proxy ──▶ gateway /mcp/all ──▶ MCP servers

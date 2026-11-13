@@ -33,6 +33,7 @@ func TestProxyInFrontOfUpstream(t *testing.T) {
 	}
 	assert.Contains(t, names, "search_tools")
 	assert.Contains(t, names, "call_write_tool")
+	assert.Contains(t, names, "call_destructive_tool")
 	assert.NotEmpty(t, cs.InitializeResult().Instructions)
 
 	res, err := cs.CallTool(t.Context(), &mcp.CallToolParams{

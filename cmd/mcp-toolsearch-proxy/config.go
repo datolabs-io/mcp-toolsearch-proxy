@@ -406,13 +406,15 @@ func allowedFlags(fs *flag.FlagSet, env func(name, fallback string) string) func
 	}
 }
 
-// writeToolsFlag adds the flag of the tools always treated as writes to fs,
+// writeToolsFlag adds the flag of the tools always treated as destructive
+// writes to fs,
 // and returns the function that checks it and sets it in a config once fs
 // is parsed.
 func writeToolsFlag(fs *flag.FlagSet, env func(name, fallback string) string) func(*config) error {
 	tools := env("TOOLSEARCH_WRITE_TOOLS", "")
 	fs.StringVar(&tools, "write-tools", tools, "comma-separated names of upstream tools, or patterns such as "+
-		"github_*, always treated as writes, so call_read_tool refuses them whatever the upstream marks them "+
+		"github_*, always treated as writes that may delete or overwrite, so only call_destructive_tool calls them "+
+		"whatever the upstream marks them "+
 		"(TOOLSEARCH_WRITE_TOOLS)")
 	return func(c *config) error {
 		var err error

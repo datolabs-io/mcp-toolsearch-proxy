@@ -60,7 +60,10 @@ func newServer(t *testing.T, opts *server.Options, g *gate) *mcp.Server {
 }
 
 func callParams(name string, args map[string]any) *mcp.CallToolParams {
-	return &mcp.CallToolParams{Name: server.ToolCallWrite, Arguments: map[string]any{"name": name, "arguments": args}}
+	return &mcp.CallToolParams{
+		Name:      server.ToolCallDestructive,
+		Arguments: map[string]any{"name": name, "arguments": args},
+	}
 }
 
 func connect(t *testing.T, endpoint string) *mcp.ClientSession {

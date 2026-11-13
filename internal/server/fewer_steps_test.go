@@ -78,7 +78,7 @@ func TestCallRefusesArgumentsThatDoNotFitWithTheSchema(t *testing.T) {
 		`{"id":null,"kind":["open"]}`:   `"kind" is an array`,
 		`{"id":{"value":1},"kind":"x"}`: `"id" is an object`,
 	} {
-		for _, tl := range []string{server.ToolCallRead, server.ToolCallWrite} {
+		for _, tl := range []string{server.ToolCallRead, server.ToolCallDestructive} {
 			res := rawCall(t, cs, tl, `{"name":"records_get","arguments":`+args+`}`)
 
 			require.True(t, res.IsError, "%s %s", tl, args)
@@ -104,7 +104,7 @@ func TestCallRefusalSaysWhenTheSchemaIsTooLargeToInclude(t *testing.T) {
 	cs, _, _ := stepsFixture(t, r, func() []*mcp.Tool { return []*mcp.Tool{schemaTool(t, "records_put", big, nil)} },
 		nil)
 
-	res := rawCall(t, cs, server.ToolCallWrite, `{"name":"records_put","arguments":{}}`)
+	res := rawCall(t, cs, server.ToolCallDestructive, `{"name":"records_put","arguments":{}}`)
 
 	require.True(t, res.IsError)
 	assert.Contains(t, text(res), `"field_000" is required and missing`)
@@ -204,7 +204,7 @@ func TestCallPassesArgumentsRealSchemasAccept(t *testing.T) {
 			cs, rec, _ := stepsFixture(t, r,
 				func() []*mcp.Tool { return []*mcp.Tool{schemaTool(t, "thing", c.schema, nil)} }, nil)
 
-			res := rawCall(t, cs, server.ToolCallWrite, `{"name":"thing","arguments":`+c.args+`}`)
+			res := rawCall(t, cs, server.ToolCallDestructive, `{"name":"thing","arguments":`+c.args+`}`)
 
 			require.False(t, res.IsError, text(res))
 			assert.Equal(t, int32(1), r.calls.Load())
@@ -220,7 +220,7 @@ func TestCallWithInvalidParamsFromTheUpstreamReturnsTheSchema(t *testing.T) {
 	cs, _, _ := stepsFixture(t, r, func() []*mcp.Tool { return []*mcp.Tool{schemaTool(t, "broken", schema, nil)} },
 		nil)
 
-	res := rawCall(t, cs, server.ToolCallWrite, `{"name":"broken","arguments":{"id":"r1"}}`)
+	res := rawCall(t, cs, server.ToolCallDestructive, `{"name":"broken","arguments":{"id":"r1"}}`)
 
 	require.True(t, res.IsError)
 	assert.Contains(t, text(res), "the upstream returned an error: no such record")
@@ -283,8 +283,8 @@ func TestCallReadsRunsEachReadAndReportsEachCall(t *testing.T) {
 	for _, want := range []string{
 		"[1/7] records_get: ok", "[2/7] records_delete: failed", "[3/7] records_nope: failed",
 		"[4/7] records_get: failed", "[5/7] records_count: failed", "[6/7] records_odd: failed",
-		"[7/7] records_get: ok", "may change things", "no tool \"records_nope\"", `"id" is a string`,
-		"among the tools that may change things", "not all of them only read",
+		"[7/7] records_get: ok", "may delete or overwrite things", "no tool \"records_nope\"", `"id" is a string`,
+		"among the tools that may delete or overwrite things", "they do not all only read",
 	} {
 		assert.Contains(t, out, want)
 	}
@@ -508,7 +508,7 @@ func TestCallReadsTakesAsManyCallsAsConfigured(t *testing.T) {
 		}
 		if c.want == nil {
 			assert.Nil(t, schema, "0 leaves the tool out")
-			assert.Len(t, res.Tools, 4)
+			assert.Len(t, res.Tools, 5)
 			continue
 		}
 		raw, err := json.Marshal(schema)

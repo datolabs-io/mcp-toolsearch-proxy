@@ -28,6 +28,9 @@ const (
 	ToolCallRead  = "call_read_tool"
 	ToolCallReads = "call_read_tools"
 	ToolCallWrite = "call_write_tool"
+	// ToolCallDestructive calls any tool, for those that may delete or
+	// overwrite something, and those whose server does not say.
+	ToolCallDestructive = "call_destructive_tool"
 )
 
 // Search limits.
@@ -73,9 +76,18 @@ type Summary struct {
 	Name        string `json:"name"`
 	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`
-	// ReadOnly says the tool only reads, so call_read_tool can call it;
-	// call_write_tool calls any other.
+	// ReadOnly says the tool only reads, so call_read_tool can call it.
 	ReadOnly bool `json:"readOnly" jsonschema:"True when the tool only reads: call it with call_read_tool."`
+	// Destructive says a tool that does not only read may delete or
+	// overwrite something, so only call_destructive_tool calls it; one that
+	// only adds is called with call_write_tool.
+	Destructive bool `json:"destructive" jsonschema:"True when the tool may delete or overwrite: call it with call_destructive_tool. Neither this nor readOnly: call_write_tool."`
+	// Idempotent says calling the tool again with the same arguments has
+	// no further effect.
+	Idempotent bool `json:"idempotent" jsonschema:"True when repeating a call with the same arguments changes nothing more."`
+	// OpenWorld says the tool reaches beyond its own server, such as the
+	// web or other people.
+	OpenWorld bool `json:"openWorld" jsonschema:"True when the tool may reach outside its server, such as the web."`
 	// Note warns of a name the upstream lists more than once.
 	Note string `json:"note,omitempty" jsonschema:"A warning about this tool, when there is one."`
 	// InputSchema is the tool's input schema, for the best matches only.
@@ -104,7 +116,9 @@ type DescribeIn struct {
 	Names []string `json:"names" jsonschema:"Names of tools, as search_tools gave them; at most 10."`
 }
 
-// Detail is a tool as describe_tool shows it: everything its server lists.
+// Detail is a tool as describe_tool shows it: everything its server lists,
+// with its annotations as the proxy reads them, the spec's defaults filled
+// in for hints the server leaves out.
 type Detail struct {
 	Name         string               `json:"name"`
 	Title        string               `json:"title,omitempty"`
@@ -126,7 +140,8 @@ type DescribeOut struct {
 	Similar map[string][]string `json:"similar,omitempty" jsonschema:"For each unknown name, the tools closest to it."`
 }
 
-// CallIn is the input of call_read_tool and call_write_tool.
+// CallIn is the input of call_read_tool, call_write_tool and
+// call_destructive_tool.
 type CallIn struct {
 	Name      string          `json:"name"                jsonschema:"The tool's name, as search_tools gave it."`
 	Arguments json.RawMessage `json:"arguments,omitempty" jsonschema:"The tool's arguments, as its input schema describes them."`
@@ -167,20 +182,20 @@ func (t *tools) register(srv *mcp.Server) {
 		OutputSchema: describeOutSchema(),
 		Annotations:  readOnly,
 	}, t.describe)
-	// Two call tools, so that a client can let reads run freely and still
-	// ask before anything else: calls of tools marked read-only, and calls
-	// of all others.
+	// Call tools by what the upstream tools they call may do, so that a
+	// client can let reads run freely, and writes that only add too if it
+	// likes, and still ask before anything that may delete or overwrite.
 	srv.AddTool(&mcp.Tool{
 		Name:  ToolCallRead,
 		Title: "Call a read-only tool",
 		Description: "Call a tool that only reads (readOnly in search_tools results), with arguments matching " +
 			"the input schema from search_tools or describe_tool. Returns the tool's own result, or, when the " +
 			"arguments do not fit, what is wrong and the schema. Tools that may change anything are refused: call " +
-			"those with call_write_tool.",
+			"those with call_write_tool or call_destructive_tool.",
 		InputSchema: callInSchema(),
 		Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: ptr(true)},
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return t.call(ctx, req, true)
+		return t.call(ctx, req, classRead)
 	})
 	if t.batch.calls > 0 {
 		srv.AddTool(&mcp.Tool{
@@ -199,15 +214,26 @@ func (t *tools) register(srv *mcp.Server) {
 	// approval in the client, which a batch would fold into one.
 	srv.AddTool(&mcp.Tool{
 		Name:  ToolCallWrite,
-		Title: "Call a tool that may change things",
-		Description: "Call a tool that may create, change or delete something (not readOnly in search_tools " +
+		Title: "Call a tool that adds things",
+		Description: "Call a tool that only creates or adds (neither readOnly nor destructive in search_tools " +
 			"results), with arguments matching the input schema from search_tools or describe_tool. Returns the " +
-			"tool's own result, or, when the arguments do not fit, what is wrong and the schema. Prefer " +
-			"call_read_tool for tools that only read.",
+			"tool's own result, or, when the arguments do not fit, what is wrong and the schema. Tools that may " +
+			"delete or overwrite are refused: call those with call_destructive_tool.",
+		InputSchema: callInSchema(),
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(false), OpenWorldHint: ptr(true)},
+	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return t.call(ctx, req, classWrite)
+	})
+	srv.AddTool(&mcp.Tool{
+		Name:  ToolCallDestructive,
+		Title: "Call a tool that may delete or overwrite things",
+		Description: "Call a tool that may delete or overwrite something (destructive in search_tools " +
+			"results), with arguments matching the input schema from search_tools or describe_tool. Returns the " +
+			"tool's own result, or, when the arguments do not fit, what is wrong and the schema.",
 		InputSchema: callInSchema(),
 		Annotations: &mcp.ToolAnnotations{DestructiveHint: ptr(true), OpenWorldHint: ptr(true)},
 	}, func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return t.call(ctx, req, false)
+		return t.call(ctx, req, classDestructive)
 	})
 }
 
@@ -239,19 +265,102 @@ func callsInSchema(limit int) *jsonschema.Schema {
 	}
 }
 
-// readOnly reports whether the upstream server marks every one of copies,
-// the tools it lists under one name, as one that only reads. A tool without
-// annotations may change anything, and one marked both read-only and
-// destructive contradicts itself, so it counts as one that may change
-// things.
-func readOnly(copies []*mcp.Tool) bool {
-	for _, tl := range copies {
-		a := tl.Annotations
-		if a == nil || !a.ReadOnlyHint || (a.DestructiveHint != nil && *a.DestructiveHint) {
-			return false
-		}
+// class is what an upstream tool may do, as its annotations say, and so
+// which call tools call it: each calls the tools of its own class and of
+// the classes below.
+type class int
+
+const (
+	// classRead tools only read: readOnlyHint, and not destructiveHint.
+	classRead class = iota
+	// classWrite tools change things but only add: neither readOnlyHint
+	// nor destructiveHint, which the server must set to false, since the
+	// spec's default is true.
+	classWrite
+	// classDestructive tools may delete or overwrite, or their server does
+	// not say otherwise.
+	classDestructive
+)
+
+// callTool is the call tool for tools of class c.
+func (c class) callTool() string {
+	switch c {
+	case classRead:
+		return ToolCallRead
+	case classWrite:
+		return ToolCallWrite
+	case classDestructive:
+		return ToolCallDestructive
+	default:
+		return ToolCallDestructive
 	}
-	return len(copies) > 0
+}
+
+// hints are a tool's four annotations as the proxy reads them, with the
+// spec's defaults for any its server leaves out. They are the server's
+// word, not a guarantee: they choose a call tool, and with it the client's
+// approval, but give the proxy no say over what a caller may call.
+type hints struct {
+	readOnly    bool
+	destructive bool
+	idempotent  bool
+	openWorld   bool
+}
+
+// toolHints reads one tool's annotations. A tool without annotations may
+// change anything, and one marked both read-only and destructive
+// contradicts itself, so it counts as one that may change things, and
+// destroy them. A read-only tool is idempotent and destroys nothing,
+// whatever else it says.
+func toolHints(tl *mcp.Tool) hints {
+	a := tl.Annotations
+	if a == nil {
+		a = &mcp.ToolAnnotations{}
+	}
+	h := hints{
+		destructive: a.DestructiveHint == nil || *a.DestructiveHint,
+		idempotent:  a.IdempotentHint,
+		openWorld:   a.OpenWorldHint == nil || *a.OpenWorldHint,
+	}
+	if a.ReadOnlyHint && (a.DestructiveHint == nil || !*a.DestructiveHint) {
+		h.readOnly, h.destructive, h.idempotent = true, false, true
+	}
+	return h
+}
+
+// hintsOf reads the annotations of copies, the tools the upstream lists
+// under one name, as one: the upstream decides which a call reaches, so
+// the name only reads if all of them do, and may destroy if any may. The
+// operator's -write-tools make a name destructive, and not idempotent,
+// whatever the upstream says.
+func (t *tools) hintsOf(copies []*mcp.Tool) hints {
+	if len(copies) == 0 {
+		return hints{destructive: true, openWorld: true}
+	}
+	h := hints{readOnly: true, idempotent: true}
+	for _, tl := range copies {
+		one := toolHints(tl)
+		h.readOnly = h.readOnly && one.readOnly
+		h.destructive = h.destructive || one.destructive
+		h.idempotent = h.idempotent && one.idempotent
+		h.openWorld = h.openWorld || one.openWorld
+	}
+	if t.listedWrite(copies[0].Name) {
+		h.readOnly, h.destructive, h.idempotent = false, true, false
+	}
+	return h
+}
+
+// class is the class of tools h describes.
+func (h hints) class() class {
+	switch {
+	case h.readOnly:
+		return classRead
+	case h.destructive:
+		return classDestructive
+	default:
+		return classWrite
+	}
 }
 
 // listedWrite reports whether the operator lists the tool called name among
@@ -265,22 +374,19 @@ func (t *tools) listedWrite(name string) bool {
 	return false
 }
 
-// reads reports whether call_read_tool may call copies, the tools listed
-// under one name: the upstream marks them all as ones that only read, and
-// the operator does not list the name among the writes.
-func (t *tools) reads(copies []*mcp.Tool) bool {
-	return readOnly(copies) && !t.listedWrite(copies[0].Name)
-}
-
-// annotations returns tl's annotations, without the read-only hint when
-// the operator lists tl among the writes.
-func (t *tools) annotations(tl *mcp.Tool) *mcp.ToolAnnotations {
-	if tl.Annotations == nil || !tl.Annotations.ReadOnlyHint || !t.listedWrite(tl.Name) {
-		return tl.Annotations
+// annotations returns the annotations describe_tool shows for copies, the
+// tools listed under one name: those of the first, with the four hints as
+// hintsOf reads them, so that each says what the proxy acts on.
+func (t *tools) annotations(copies []*mcp.Tool) *mcp.ToolAnnotations {
+	h := t.hintsOf(copies)
+	a := &mcp.ToolAnnotations{
+		ReadOnlyHint: h.readOnly, DestructiveHint: ptr(h.destructive),
+		IdempotentHint: h.idempotent, OpenWorldHint: ptr(h.openWorld),
 	}
-	a := *tl.Annotations
-	a.ReadOnlyHint = false
-	return &a
+	if len(copies) > 0 && copies[0].Annotations != nil {
+		a.Title = copies[0].Annotations.Title
+	}
+	return a
 }
 
 // ambiguousNote warns of a name the upstream lists n times.
@@ -289,7 +395,7 @@ func ambiguousNote(n int) string {
 		return ""
 	}
 	return fmt.Sprintf("The upstream lists %d tools under this name and decides which one a call reaches; "+
-		"it counts as read-only only if all of them are.", n)
+		"it counts as read-only only if all of them are, and as destructive if any is.", n)
 }
 
 func ptr[T any](v T) *T { return &v }
@@ -441,9 +547,11 @@ func (t *tools) search(
 		tools := make([]Summary, 0, len(found))
 		for i, tl := range found {
 			copies := c.Copies(tl.Name)
+			h := t.hintsOf(copies)
 			s := Summary{
 				Name: tl.Name, Title: tl.Title, Description: summary(tl.Description),
-				ReadOnly: t.reads(copies), Note: ambiguousNote(len(copies)),
+				ReadOnly: h.readOnly, Destructive: h.destructive, Idempotent: h.idempotent, OpenWorld: h.openWorld,
+				Note: ambiguousNote(len(copies)),
 			}
 			if i < withSchemas && !given[tl.Name] && schemaFits(tl.InputSchema) {
 				s.InputSchema, given[tl.Name] = tl.InputSchema, true
@@ -533,17 +641,17 @@ func (t *tools) describe(
 		}
 		out.Tools = append(out.Tools, Detail{
 			Name: tl.Name, Title: tl.Title, Description: tl.Description,
-			InputSchema: tl.InputSchema, OutputSchema: tl.OutputSchema, Annotations: t.annotations(tl),
+			InputSchema: tl.InputSchema, OutputSchema: tl.OutputSchema, Annotations: t.annotations(c.Copies(name)),
 			Note: ambiguousNote(len(c.Copies(name))),
 		})
 	}
 	return nil, out, nil
 }
 
-// call calls the upstream tool req names. With readOnlyOnly, as for
-// call_read_tool, a tool the upstream does not mark read-only is refused, so
-// that a client's permission to read never lets a write through.
-func (t *tools) call(ctx context.Context, req *mcp.CallToolRequest, readOnlyOnly bool) (*mcp.CallToolResult, error) {
+// call calls the upstream tool req names, refusing one of a class above
+// allowed, so that a client's permission to read never lets a write through,
+// nor its permission to add a write that may destroy.
+func (t *tools) call(ctx context.Context, req *mcp.CallToolRequest, allowed class) (*mcp.CallToolResult, error) {
 	in, err := parseCall(req.Params.Arguments)
 	if err != nil {
 		return toolError(fmt.Sprintf("input of %s: %v", req.Params.Name, err)), nil
@@ -555,9 +663,12 @@ func (t *tools) call(ctx context.Context, req *mcp.CallToolRequest, readOnlyOnly
 	if err != nil {
 		return toolError(err.Error()), nil
 	}
-	res, outcome := t.callOne(ctx, req, c, in, readOnlyOnly)
-	if outcome == OutcomeInvalidArguments {
+	res, outcome := t.callOne(ctx, req, c, in, allowed)
+	switch outcome {
+	case OutcomeInvalidArguments:
 		invalidArguments(ctx)
+	case OutcomeWrongTool:
+		wrongTool(ctx)
 	}
 	return res, nil
 }
@@ -578,7 +689,7 @@ func checkName(name string) string {
 // callOne calls the upstream tool in names, from the caller's catalog c, as
 // call does, and returns its result with the outcome it counts as.
 func (t *tools) callOne(
-	ctx context.Context, req *mcp.CallToolRequest, c *catalog.Catalog, in callInput, readOnlyOnly bool,
+	ctx context.Context, req *mcp.CallToolRequest, c *catalog.Catalog, in callInput, allowed class,
 ) (*mcp.CallToolResult, string) {
 	copies := c.Copies(in.Name)
 	if len(copies) == 0 {
@@ -591,8 +702,9 @@ func (t *tools) callOne(
 			return toolError(unknownTool(ctx, c, t.store.Embedder(), in.Name)), OutcomeToolError
 		}
 	}
-	if readOnlyOnly && !t.reads(copies) {
-		return toolError(notARead(in.Name, copies)), OutcomeToolError
+	h := t.hintsOf(copies)
+	if h.class() > allowed {
+		return toolError(t.misrouted(in.Name, copies, h.class(), allowed)), OutcomeWrongTool
 	}
 	// Under a repeated name, the upstream decides which tool a call reaches,
 	// so no one schema can be held against the arguments.
@@ -603,7 +715,7 @@ func (t *tools) callOne(
 	}
 	res, err := t.caller.CallTool(ctx, authorization(req.Extra), in.Name, in.Arguments)
 	if err != nil {
-		return toolError(t.noResult(ctx, copies, err, readOnlyOnly)), OutcomeUpstreamError
+		return toolError(t.noResult(ctx, copies, err, allowed == classRead, h.idempotent)), OutcomeUpstreamError
 	}
 	if res.IsError {
 		return res, OutcomeToolError
@@ -611,19 +723,23 @@ func (t *tools) callOne(
 	return res, OutcomeOK
 }
 
-// notARead explains why call_read_tool does not call name, listed as
-// copies.
-func notARead(name string, copies []*mcp.Tool) string {
-	if readOnly(copies) {
-		return fmt.Sprintf("this proxy lists %s among the tools that may change things, so %s "+
-			"does not call it: call it with %s", name, ToolCallRead, ToolCallWrite)
+// misrouted explains why the call tool for class allowed does not call name,
+// listed as copies, of class got, and which call tool does.
+func (t *tools) misrouted(name string, copies []*mcp.Tool, got, allowed class) string {
+	var why string
+	switch {
+	case t.listedWrite(name):
+		why = fmt.Sprintf("this proxy lists %s among the tools that may delete or overwrite things", name)
+	case len(copies) > 1:
+		why = fmt.Sprintf("the upstream lists %d tools named %s and they do not all only read or only add",
+			len(copies), name)
+	case got == classWrite:
+		why = name + " may change things"
+	default:
+		why = name + " may delete or overwrite things: its server does not mark it as one that only " +
+			"reads or only adds"
 	}
-	if len(copies) > 1 {
-		return fmt.Sprintf("the upstream lists %d tools named %s and not all of them only read, "+
-			"so %s does not call it: call it with %s", len(copies), name, ToolCallRead, ToolCallWrite)
-	}
-	return fmt.Sprintf("%s may change things, so %s does not call it: call it with %s",
-		name, ToolCallRead, ToolCallWrite)
+	return fmt.Sprintf("%s, so %s does not call it: call it with %s", why, allowed.callTool(), got.callTool())
 }
 
 // noResult logs why a call to the upstream tool listed as copies got no
@@ -631,7 +747,11 @@ func notARead(name string, copies []*mcp.Tool) string {
 // answered and whether the tool may have run, never the transport's
 // detail, which holds the upstream's address. The log has that detail,
 // but never a message of the upstream's, which may repeat the arguments.
-func (t *tools) noResult(ctx context.Context, copies []*mcp.Tool, err error, readOnlyOnly bool) string {
+// A write's text says whether its server marks it idempotent, so whether
+// calling it again is safe on the server's word.
+func (t *tools) noResult(
+	ctx context.Context, copies []*mcp.Tool, err error, readOnlyOnly, idempotent bool,
+) string {
 	upstreamFailed(ctx)
 	name := copies[0].Name
 	f := failure(err)
@@ -654,15 +774,23 @@ func (t *tools) noResult(ctx context.Context, copies []*mcp.Tool, err error, rea
 			"or fewer fields"
 	case f.Class == upstream.ClassTooLarge:
 		return "the tool's result is larger than this proxy passes on, so it is not returned; the tool may " +
-			"still have run. Check its effect with a read tool before calling it again."
+			"still have run. " + again(idempotent)
 	case !f.Sent:
 		return fmt.Sprintf("the upstream server could not be reached (%s); the tool was not called", f.Class)
 	case readOnlyOnly:
 		return fmt.Sprintf("no result arrived (%s) from the upstream server", f.Class)
 	default:
-		return fmt.Sprintf("no result arrived (%s); the tool may still have run. "+
-			"Check its effect with a read tool before calling it again.", f.Class)
+		return fmt.Sprintf("no result arrived (%s); the tool may still have run. ", f.Class) + again(idempotent)
 	}
+}
+
+// again says whether a write that may have run can be called again.
+func again(idempotent bool) string {
+	if idempotent {
+		return "Its server marks it idempotent, so calling it again with the same arguments should have no " +
+			"further effect."
+	}
+	return "It is not marked idempotent: check its effect with a read tool before calling it again."
 }
 
 // callInput is the input of a call tool, as parseCall reads it.

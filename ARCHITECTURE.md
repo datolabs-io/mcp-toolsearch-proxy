@@ -1,24 +1,36 @@
 # mcp-toolsearch-proxy architecture
 
-`mcp-toolsearch-proxy` is an MCP server with five tools, `search_tools`, `describe_tool`, `call_read_tool`,
-`call_read_tools` and `call_write_tool`, in front of one upstream MCP server with many. It is a client of that upstream
-on behalf of each caller, with the caller's own token (ADR 4), and keeps nothing on disk but the model it searches with.
+`mcp-toolsearch-proxy` is an MCP server with six tools, `search_tools`, `describe_tool`, `call_read_tool`,
+`call_read_tools`, `call_write_tool` and `call_destructive_tool`, in front of one upstream MCP server with many. It
+is a client of that upstream on behalf of each caller, with the caller's own token (ADR 4), and keeps nothing on disk
+but the model it searches with.
 
-`call_read_tool` calls only tools the upstream marks read-only (`readOnlyHint`), and is itself marked read-only;
-`call_write_tool` calls any tool and is marked destructive. A client can then let reads run without asking and keep
-asking before everything else. The upstream's annotations decide which is which, so a server that marks a write as
-read-only lets it through `call_read_tool`; the gateway's authorization still applies to every call. The check reads
-the caller's catalog, so a tool that loses `readOnlyHint` upstream still runs through `call_read_tool` until the
-catalog is listed again. That takes up to `-catalog-max-age`: an expired catalog is still served for the request that
-starts its relist, and while listing fails. Tools the operator names in `-write-tools` count as writes whatever the
-upstream marks them: the setting only narrows what `call_read_tool` allows, and gives the proxy no say over what a
-caller may call.
+The proxy reads the four hints MCP gives a tool, with the spec's defaults for those a server leaves out
+(`readOnlyHint` false, `destructiveHint` true, `idempotentHint` false, `openWorldHint` true), and puts each tool in one
+of three classes. A read is marked `readOnlyHint` and not `destructiveHint`. A write that only adds is not a read and is
+marked `destructiveHint: false` explicitly. Every other tool, one without annotations among them, is destructive. Each
+call tool calls the tools of its class and of those below it: `call_read_tool` (and `call_read_tools`) only reads and
+is marked read-only, `call_write_tool` also calls writes that only add and is marked `destructiveHint: false`, and
+`call_destructive_tool` calls any tool and is marked destructive. A client can then let reads run without asking,
+choose for writes that only add, and keep asking before anything that may delete or overwrite. A call through a tool
+below the class it needs is refused with the one to use, and counts as the outcome `wrong_tool`.
+
+The upstream's annotations decide which is which, so a server that marks a write as read-only lets it through
+`call_read_tool`, and one that marks a delete `destructiveHint: false` lets it through `call_write_tool`; they are hints
+that choose the client's approval, never a security boundary, and the gateway's authorization still applies to every
+call. `idempotentHint` and `openWorldHint` choose no call tool: `search_tools` and `describe_tool` show them with the
+other two, and a write that got no result says whether its server marks it idempotent. The check reads the caller's
+catalog, so a tool whose annotations change upstream keeps its old class until the catalog is listed again. That
+takes up to `-catalog-max-age`: an expired catalog is still served for the request that starts its relist, and while
+listing fails. Tools the operator names in `-write-tools` count as destructive, and not idempotent, whatever the
+upstream marks them: the setting only moves tools towards `call_destructive_tool`, and gives the proxy no say over what
+a caller may call.
 
 ## Layout
 
 ```text
 cmd/mcp-toolsearch-proxy/  the program: configuration, start-up, signals, fetch-model
-internal/server/           the MCP server, its five tools, argument checks, the HTTP handler, logging
+internal/server/           the MCP server, its six tools, argument checks, the HTTP handler, logging
 internal/catalog/          a catalog of tools per caller, built from the caller's own tools/list (ADR 5)
 internal/search/           lexical ranking (BM25 over folded, stemmed words), cosine ranking and their fusion
 internal/embed/            the built-in static embedding model: tokenizer, weights, download (ADR 6)
@@ -71,7 +83,8 @@ another is called. The
 arguments then go upstream as the caller's bytes, never decoded and encoded again, so large integers and number
 formats arrive unchanged. A call that gets no result says which of three cases it was: the upstream answered with an
 error, which is passed on; the upstream could not be reached or refused the credential, so the tool was not called; or
-the request went out and no result came back, in which case `call_write_tool` says the tool may still have run. The
+the request went out and no result came back, in which case a write's call tool says the tool may still have run,
+and whether its server marks it idempotent. The
 text names a coarse class (timeout, refused, unauthorized, dropped, too large) and never the transport's error, which
 holds the upstream's address; that goes to the log.
 
@@ -100,9 +113,9 @@ its own rather than another form of `call_read_tool`'s input, so that each input
 writes have no batch tool, so that each keeps its own approval in the client.
 
 The upstream decides which tool a call reaches, by name. A listing that holds one name more than once is ambiguous:
-the catalog indexes the name once, `search_tools` shows it with a note, and it counts as read-only only if every copy
-is, so `call_read_tool` refuses it otherwise. A tool marked both `readOnlyHint` and `destructiveHint` contradicts itself
-and counts as one that may change things.
+the catalog indexes the name once, `search_tools` shows it with a note, and its hints are read together: it is a read
+only if every copy is, destructive if any copy is, idempotent only if every copy is and open-world if any is. A tool
+marked both `readOnlyHint` and `destructiveHint` contradicts itself and counts as destructive.
 
 When the proxy stops, requests running get `-shutdown-grace` to finish (the call timeout plus 15 s by default) before
 their connections are closed. Closing one cancels its call upstream, but a write the upstream already passed on may
@@ -124,7 +137,7 @@ below the cap. Everything else that grows is bounded:
 - Upstream responses: the SDK reads one whole, and it is decoded and encoded again on its way back, so a result costs
   about three times its size. What an operation receives after the handshake, a call's result or every page of a
   listing together, is cut off past `-max-response-bytes` (32 MiB). The call fails alone, saying the result was too
-  large, and for `call_write_tool` that the tool may have run. A listing fails, and is not retried, past the same size,
+  large, and for a write that the tool may have run. A listing fails, and is not retried, past the same size,
   `-max-tools` (10,000) or 100 pages. The bound is per request: calls in flight together may each take that much.
 - Input: a query over 1,000 characters, or a tool name over 256 bytes, is refused before any lookup, since lexical
   search costs the catalog's size times the query's words. The tokenizer stops segmenting once it has the pieces it

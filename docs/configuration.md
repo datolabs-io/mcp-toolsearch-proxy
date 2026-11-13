@@ -35,4 +35,4 @@ no secret. `mcp-toolsearch-proxy -h` prints the same list.
 | `-upstream` | `TOOLSEARCH_UPSTREAM` | empty | streamable HTTP URL of the MCP server whose tools are searched, such as a gateway |
 | `-upstream-host` | `TOOLSEARCH_UPSTREAM_HOST` | empty | Host header for upstream requests instead of the URL's, for a gateway reached at an internal address whose servers accept only its public name |
 | `-upstream-protocol` | `TOOLSEARCH_UPSTREAM_PROTOCOL` | `latest` | MCP version to speak upstream, such as 2025-11-25, or latest for the newest supported; an older one helps a gateway whose servers fail the newest handshake |
-| `-write-tools` | `TOOLSEARCH_WRITE_TOOLS` | empty | comma-separated names of upstream tools, or patterns such as github_*, always treated as writes, so call_read_tool refuses them whatever the upstream marks them |
+| `-write-tools` | `TOOLSEARCH_WRITE_TOOLS` | empty | comma-separated names of upstream tools, or patterns such as github_*, always treated as writes that may delete or overwrite, so only call_destructive_tool calls them whatever the upstream marks them |
