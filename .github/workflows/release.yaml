@@ -62,7 +62,7 @@ jobs:
       # writes: every tool is downloaded fresh and checked against mise.lock
       # (the action installs in locked mode when the lock file is present).
       # Only the tools the release needs are installed.
-      - uses: jdx/mise-action@v5.2.6
+      - uses: jdx/mise-action@v5.2.8
         with:
           cache: false
           install_args: go goreleaser syft
@@ -145,7 +145,7 @@ jobs:
         with:
           ref: ${{ needs.release-please.outputs.tag }}
           persist-credentials: false
-      - uses: jdx/mise-action@v5.2.6
+      - uses: jdx/mise-action@v5.2.8
         with:
           cache: false
           install_args: github:modelcontextprotocol/registry
